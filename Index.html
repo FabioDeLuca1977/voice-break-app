@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Break - Analisi Vocale AI</title>
+    <title>Voice Break AI - Sistema di Analisi Vocale</title>
     <style>
         * {
             margin: 0;
@@ -15,282 +15,274 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
             color: #333;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
+            padding: 20px;
         }
 
         .header {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            padding: 30px;
             text-align: center;
             color: white;
+            margin-bottom: 50px;
+            padding: 40px 0;
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 3.5em;
+            margin-bottom: 15px;
             font-weight: 700;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
-        .main-content {
-            padding: 40px;
+        .header .tagline {
+            font-size: 1.3em;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.5;
         }
 
-        .voice-selector {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        .voice-buttons {
+        .main-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
         }
 
-        .voice-btn {
+        .card {
             background: white;
-            border: 3px solid transparent;
-            border-radius: 15px;
-            padding: 20px;
-            cursor: pointer;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
             transition: all 0.3s ease;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
         }
 
-        .voice-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
         }
 
-        .voice-btn.active {
-            border-color: #4facfe;
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+
+        .card.user-section::before {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .card.trainer-section::before {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+        }
+
+        .card.developer-section::before {
+            background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+        }
+
+        .card-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .card-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .card-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 25px;
+            font-size: 1.05em;
+        }
+
+        .card-features {
+            list-style: none;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .card-features li {
+            padding: 8px 0;
+            color: #555;
+            position: relative;
+            padding-left: 25px;
+        }
+
+        .card-features li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #4facfe;
+            font-weight: bold;
+        }
+
+        .btn {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-        }
-
-        .voice-btn .icon {
-            font-size: 2em;
-            margin-bottom: 10px;
-            display: block;
-        }
-
-        .voice-btn .name {
-            font-weight: 600;
-            font-size: 1.1em;
-            margin-bottom: 5px;
-        }
-
-        .recording-section {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            text-align: center;
-            border: 2px solid #e9ecef;
-        }
-
-        .recording-section.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-
-        .record-button {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
             border: none;
-            background: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
-            color: white;
-            font-size: 3em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-            margin: 20px 0;
-        }
-
-        .record-button:hover {
-            transform: scale(1.05);
-        }
-
-        .record-button.recording {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        .recording-timer {
-            font-size: 1.5em;
-            font-weight: 700;
-            color: #333;
-            margin: 10px 0;
-            font-family: 'Courier New', monospace;
-        }
-
-        .analysis-results {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-            border: 2px solid #e9ecef;
-            display: none;
-        }
-
-        .analysis-results.show {
-            display: block;
-            animation: fadeIn 0.5s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .classification-result {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 15px;
-        }
-
-        .predicted-voice {
-            font-size: 2em;
-            margin-bottom: 15px;
-        }
-
-        .confidence-score {
-            font-size: 1.2em;
-            font-weight: 600;
-            padding: 8px 16px;
-            border-radius: 20px;
-            display: inline-block;
-        }
-
-        .confidence-score.high { background: #d1fae5; color: #065f46; }
-        .confidence-score.medium { background: #fef3c7; color: #92400e; }
-        .confidence-score.low { background: #fee2e2; color: #991b1b; }
-
-        .comparison-chart {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 25px;
-            margin: 25px 0;
-        }
-
-        .chart-container {
-            height: 300px;
-            position: relative;
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-        }
-
-        .feedback-section {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 30px;
-        }
-
-        .feedback-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        .feedback-card.strengths {
-            border-left: 5px solid #22c55e;
-        }
-
-        .feedback-card.improvements {
-            border-left: 5px solid #f59e0b;
-        }
-
-        .feedback-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-        }
-
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 30px;
-        }
-
-        .action-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
+            padding: 15px 30px;
             border-radius: 25px;
-            font-size: 1em;
+            font-size: 1.1em;
             font-weight: 600;
             cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn.trainer {
+            background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+        }
+
+        .btn.trainer:hover {
+            box-shadow: 0 8px 25px rgba(255, 167, 38, 0.4);
+        }
+
+        .btn.developer {
+            background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+        }
+
+        .btn.developer:hover {
+            box-shadow: 0 8px 25px rgba(239, 83, 80, 0.4);
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-item {
+            flex: 1;
+        }
+
+        .status-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #4facfe;
+            display: block;
+        }
+
+        .status-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .voice-types {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .voice-type {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
             transition: all 0.3s ease;
         }
 
-        .action-btn:hover {
+        .voice-type:hover {
+            background: #e9ecef;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .voice-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .voice-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .footer {
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            padding: 30px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5em;
+            }
+            
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .voice-types {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 15px;
+            }
         }
 
         .loading {
-            display: flex;
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            padding: 20px;
+            color: white;
+            font-size: 1.2em;
         }
 
         .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #e9ecef;
-            border-top: 2px solid #4facfe;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-right: 15px;
         }
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .main-content {
-                padding: 20px;
-            }
-            
-            .voice-buttons {
-                grid-template-columns: 1fr;
-            }
-            
-            .feedback-section {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
@@ -298,156 +290,198 @@
     <div class="container">
         <div class="header">
             <h1>🎤 Voice Break AI</h1>
-            <p>Sistema di Analisi Vocale con Machine Learning</p>
+            <p class="tagline">
+                Sistema avanzato di analisi vocale per il training delle 4 voci comunicative
+            </p>
         </div>
 
-        <div class="main-content">
-            <!-- Voice Selection -->
-            <div class="voice-selector">
-                <h2>Seleziona la Voce da Praticare</h2>
-                <div class="voice-buttons">
-                    <div class="voice-btn" data-voice="aria">
-                        <span class="icon">🌬️</span>
-                        <div class="name">Aria</div>
-                        <div class="description">Apertura e Connessione</div>
-                    </div>
-                    <div class="voice-btn" data-voice="acqua">
-                        <span class="icon">💧</span>
-                        <div class="name">Acqua</div>
-                        <div class="description">Condivisione e Ascolto</div>
-                    </div>
-                    <div class="voice-btn" data-voice="terra">
-                        <span class="icon">🌍</span>
-                        <div class="name">Terra</div>
-                        <div class="description">Argomentazione e Chiarezza</div>
-                    </div>
-                    <div class="voice-btn" data-voice="fuoco">
-                        <span class="icon">🔥</span>
-                        <div class="name">Fuoco</div>
-                        <div class="description">Chiusura e Impegno</div>
-                    </div>
-                </div>
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-number" id="totalSamples">1,247</span>
+                <div class="status-label">Campioni Audio</div>
+            </div>
+            <div class="status-item">
+                <span class="status-number" id="modelAccuracy">94%</span>
+                <div class="status-label">Accuratezza Modello</div>
+            </div>
+            <div class="status-item">
+                <span class="status-number" id="activeSessions">23</span>
+                <div class="status-label">Sessioni Attive</div>
+            </div>
+            <div class="status-item">
+                <span class="status-number" id="lastUpdate">2h</span>
+                <div class="status-label">Ultimo Aggiornamento</div>
+            </div>
+        </div>
+
+        <div class="voice-types">
+            <div class="voice-type">
+                <span class="voice-icon">🌬️</span>
+                <div class="voice-name">Aria</div>
+            </div>
+            <div class="voice-type">
+                <span class="voice-icon">💧</span>
+                <div class="voice-name">Acqua</div>
+            </div>
+            <div class="voice-type">
+                <span class="voice-icon">🌍</span>
+                <div class="voice-name">Terra</div>
+            </div>
+            <div class="voice-type">
+                <span class="voice-icon">🔥</span>
+                <div class="voice-name">Fuoco</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="card user-section">
+                <span class="card-icon">🎯</span>
+                <h2 class="card-title">Utente</h2>
+                <p class="card-description">
+                    Pratica e migliora le tue competenze vocali con feedback AI personalizzato
+                </p>
+                <ul class="card-features">
+                    <li>Analisi vocale in tempo reale</li>
+                    <li>Feedback personalizzato per ogni voce</li>
+                    <li>Tracciamento progressi nel tempo</li>
+                    <li>Esercizi guidati e suggerimenti</li>
+                </ul>
+                <a href="voice-selection.html" class="btn">Inizia Training</a>
             </div>
 
-            <!-- Recording Section -->
-            <div class="recording-section disabled" id="recordingSection">
-                <h3>🎤 Registrazione Vocale</h3>
-                <p id="recordingTip">Seleziona una voce per iniziare</p>
-                
-                <button class="record-button" id="recordButton">🎤</button>
-                <div class="recording-timer" id="recordingTimer">00:00</div>
+            <div class="card trainer-section">
+                <span class="card-icon">🎓</span>
+                <h2 class="card-title">Trainer</h2>
+                <p class="card-description">
+                    Addestra e ottimizza il sistema AI correggendo le etichettature automatiche
+                </p>
+                <ul class="card-features">
+                    <li>Correzione etichette automatiche</li>
+                    <li>Validazione campioni audio</li>
+                    <li>Miglioramento accuracy modello</li>
+                    <li>Analytics prestazioni sistema</li>
+                </ul>
+                <a href="trainer.html" class="btn trainer">Pannello Trainer</a>
             </div>
 
-            <!-- Analysis Results -->
-            <div class="analysis-results" id="analysisResults">
-                <div class="classification-result">
-                    <div class="predicted-voice" id="predictedVoice"></div>
-                    <div class="confidence-score" id="confidenceScore"></div>
-                </div>
-
-                <div class="comparison-chart">
-                    <h3>📊 Confronto con il Modello Ideale</h3>
-                    <div class="chart-container">
-                        <canvas id="comparisonChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="feedback-section">
-                    <div class="feedback-card strengths">
-                        <h4>✅ Punti di Forza</h4>
-                        <div id="strengthsFeedback"></div>
-                    </div>
-                    
-                    <div class="feedback-card improvements">
-                        <h4>🎯 Aree di Miglioramento</h4>
-                        <div id="improvementsFeedback"></div>
-                    </div>
-                </div>
-
-                <div class="action-buttons">
-                    <button class="action-btn" id="recordAgainBtn">🔄 Registra di Nuovo</button>
-                    <button class="action-btn" id="changeVoiceBtn">🔀 Cambia Voce</button>
-                </div>
+            <div class="card developer-section">
+                <span class="card-icon">⚙️</span>
+                <h2 class="card-title">Sviluppatore</h2>
+                <p class="card-description">
+                    Gestisci il database degli esempi, il motore ML e i modelli di voice recognition
+                </p>
+                <ul class="card-features">
+                    <li>Upload esempi vocali per training</li>
+                    <li>Gestione modelli Machine Learning</li>
+                    <li>Configurazione parametri AI</li>
+                    <li>Backup e versioning sistema</li>
+                </ul>
+                <a href="developer.html" class="btn developer">Pannello Developer</a>
             </div>
+        </div>
 
-            <div class="loading" id="loadingState" style="display: none;">
-                <div class="spinner"></div>
-                <span>Analizzando la tua voce...</span>
-            </div>
+        <div class="footer">
+            <p>&copy; 2025 Voice Break AI - Sistema di Analisi Vocale Avanzato</p>
+            <p>Powered by Machine Learning & Web Audio API</p>
         </div>
     </div>
 
+    <div class="loading" id="loadingOverlay">
+        <div class="spinner"></div>
+        <span>Caricamento in corso...</span>
+    </div>
+
     <script>
-        class VoiceBreakApp {
+        class VoiceBreakHome {
             constructor() {
-                this.selectedVoice = null;
-                this.isRecording = false;
-                this.audioContext = null;
-                this.mediaRecorder = null;
-                this.stream = null;
-                this.recordingTimer = null;
-                this.recordingTime = 0;
-                this.audioInitialized = false;
-                this.demoMode = false;
-                
-                this.voiceModels = {
-                    aria: {
-                        name: 'Aria',
-                        icon: '🌬️',
-                        tip: 'Usa un tono leggero e ascendente, come una brezza che sale'
-                    },
-                    acqua: {
-                        name: 'Acqua',
-                        icon: '💧',
-                        tip: 'Parla lentamente con pause, tono discendente e morbido'
-                    },
-                    terra: {
-                        name: 'Terra',
-                        icon: '🌍',
-                        tip: 'Usa un tono fermo e strutturato, come la solidità della terra'
-                    },
-                    fuoco: {
-                        name: 'Fuoco',
-                        icon: '🔥',
-                        tip: 'Energia alta, ritmo veloce, tono deciso che spinge all\'azione'
-                    }
-                };
-                
                 this.init();
             }
 
             init() {
                 this.setupEventListeners();
-                this.showPermissionRequest();
-                console.log('Voice Break App initialized');
+                this.loadSystemStats();
+                this.checkSystemStatus();
+                console.log('Voice Break Home initialized');
             }
 
             setupEventListeners() {
-                // Voice selection
-                document.querySelectorAll('.voice-btn').forEach(btn => {
+                // Gestione click sui pulsanti principali
+                document.querySelectorAll('.btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
-                        this.selectVoice(e.currentTarget.dataset.voice);
+                        const href = btn.getAttribute('href');
+                        if (href && !href.startsWith('#')) {
+                            this.showLoading();
+                            // Il browser seguirà automaticamente il link
+                        }
                     });
                 });
 
-                // Recording button
-                document.getElementById('recordButton').addEventListener('click', () => {
-                    this.toggleRecording();
+                // Hover effects per le voice types
+                document.querySelectorAll('.voice-type').forEach(voiceType => {
+                    voiceType.addEventListener('click', () => {
+                        const voiceName = voiceType.querySelector('.voice-name').textContent.toLowerCase();
+                        this.showVoiceInfo(voiceName);
+                    });
                 });
 
-                // Action buttons
-                document.getElementById('recordAgainBtn').addEventListener('click', () => {
-                    this.recordAgain();
-                });
-
-                document.getElementById('changeVoiceBtn').addEventListener('click', () => {
-                    this.changeVoice();
-                });
+                // Aggiornamento stats ogni 30 secondi
+                setInterval(() => {
+                    this.updateStats();
+                }, 30000);
             }
 
-            showPermissionRequest() {
-                const permissionOverlay = document.createElement('div');
-                permissionOverlay.innerHTML = `
+            showLoading() {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+            }
+
+            hideLoading() {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+
+            async loadSystemStats() {
+                try {
+                    // Simula il caricamento delle statistiche
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    const stats = {
+                        totalSamples: Math.floor(Math.random() * 500) + 1000,
+                        modelAccuracy: Math.floor(Math.random() * 10) + 90,
+                        activeSessions: Math.floor(Math.random() * 30) + 10,
+                        lastUpdate: Math.floor(Math.random() * 5) + 1
+                    };
+                    
+                    this.updateStatsDisplay(stats);
+                } catch (error) {
+                    console.error('Error loading stats:', error);
+                }
+            }
+
+            updateStatsDisplay(stats) {
+                document.getElementById('totalSamples').textContent = stats.totalSamples.toLocaleString();
+                document.getElementById('modelAccuracy').textContent = stats.modelAccuracy + '%';
+                document.getElementById('activeSessions').textContent = stats.activeSessions;
+                document.getElementById('lastUpdate').textContent = stats.lastUpdate + 'h';
+            }
+
+            async updateStats() {
+                // Aggiornamento stats in background
+                const currentSamples = parseInt(document.getElementById('totalSamples').textContent.replace(',', ''));
+                const newSamples = currentSamples + Math.floor(Math.random() * 5);
+                document.getElementById('totalSamples').textContent = newSamples.toLocaleString();
+            }
+
+            checkSystemStatus() {
+                // Verifica lo stato del sistema ML
+                const modelStatus = localStorage.getItem('voiceBreakModelStatus');
+                if (!modelStatus) {
+                    this.showFirstTimeSetup();
+                }
+            }
+
+            showFirstTimeSetup() {
+                // Mostra popup per setup iniziale se necessario
+                const setupModal = document.createElement('div');
+                setupModal.innerHTML = `
                     <div style="
                         position: fixed;
                         top: 0;
@@ -458,8 +492,7 @@
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        z-index: 10000;
-                        backdrop-filter: blur(5px);
+                        z-index: 20000;
                     ">
                         <div style="
                             background: white;
@@ -468,17 +501,13 @@
                             text-align: center;
                             max-width: 500px;
                             margin: 20px;
-                            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
                         ">
-                            <div style="font-size: 4em; margin-bottom: 20px;">🎤</div>
-                            <h2 style="margin-bottom: 15px; color: #333;">Permesso Microfono</h2>
+                            <h2 style="margin-bottom: 20px; color: #333;">🚀 Benvenuto in Voice Break AI</h2>
                             <p style="margin-bottom: 25px; color: #666; line-height: 1.5;">
-                                Voice Break ha bisogno di accedere al tuo microfono per analizzare la tua voce.
-                                <br><br>
-                                <strong>I tuoi dati audio vengono elaborati solo localmente.</strong>
+                                Sistema non ancora configurato. Accedi al pannello Developer per inizializzare il motore ML.
                             </p>
-                            <button id="requestPermissionBtn" style="
-                                background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                            <button id="setupBtn" style="
+                                background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
                                 color: white;
                                 border: none;
                                 padding: 15px 30px;
@@ -488,9 +517,9 @@
                                 cursor: pointer;
                                 margin-right: 10px;
                             ">
-                                🎤 Concedi Permesso
+                                Vai al Setup
                             </button>
-                            <button id="skipPermissionBtn" style="
+                            <button id="laterBtn" style="
                                 background: #6c757d;
                                 color: white;
                                 border: none;
@@ -500,419 +529,66 @@
                                 font-weight: 600;
                                 cursor: pointer;
                             ">
-                                Modalità Demo
+                                Più Tardi
                             </button>
                         </div>
                     </div>
                 `;
                 
-                document.body.appendChild(permissionOverlay);
+                document.body.appendChild(setupModal);
                 
-                document.getElementById('requestPermissionBtn').addEventListener('click', async () => {
-                    try {
-                        await this.initializeAudio();
-                        permissionOverlay.remove();
-                        this.showNotification('✅ Microfono attivato!', 'success');
-                    } catch (error) {
-                        this.showPermissionError(error);
+                document.getElementById('setupBtn').addEventListener('click', () => {
+                    window.location.href = 'developer.html';
+                });
+                
+                document.getElementById('laterBtn').addEventListener('click', () => {
+                    setupModal.remove();
+                    localStorage.setItem('voiceBreakModelStatus', 'pending');
+                });
+            }
+
+            showVoiceInfo(voiceName) {
+                const voiceInfo = {
+                    aria: {
+                        description: 'Voce di apertura e connessione',
+                        characteristics: ['Tono ascendente', 'Ritmo moderato', 'Energia crescente'],
+                        examples: 247
+                    },
+                    acqua: {
+                        description: 'Voce di condivisione e ascolto',
+                        characteristics: ['Tono discendente', 'Ritmo lento', 'Pause significative'],
+                        examples: 312
+                    },
+                    terra: {
+                        description: 'Voce di argomentazione e chiarezza',
+                        characteristics: ['Tono stabile', 'Ritmo strutturato', 'Pronuncia netta'],
+                        examples: 298
+                    },
+                    fuoco: {
+                        description: 'Voce di chiusura e impegno',
+                        characteristics: ['Tono deciso', 'Ritmo veloce', 'Energia alta'],
+                        examples: 390
                     }
-                });
-                
-                document.getElementById('skipPermissionBtn').addEventListener('click', () => {
-                    permissionOverlay.remove();
-                    this.enableDemoMode();
-                });
-            }
-
-            async initializeAudio() {
-                this.stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    } 
-                });
-                
-                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                this.audioInitialized = true;
-                console.log('Audio initialized successfully');
-            }
-
-            showPermissionError(error) {
-                let message = '❌ Errore microfono: ';
-                if (error.name === 'NotAllowedError') {
-                    message += 'Permesso negato. Abilita il microfono nelle impostazioni del browser.';
-                } else {
-                    message += error.message;
-                }
-                
-                this.showNotification(message, 'error', 8000);
-                
-                setTimeout(() => {
-                    if (confirm('Vuoi continuare in modalità demo?')) {
-                        this.enableDemoMode();
-                    }
-                }, 2000);
-            }
-
-            enableDemoMode() {
-                this.demoMode = true;
-                this.showNotification('📱 Modalità Demo attivata', 'info');
-                document.getElementById('recordingTip').textContent = 'Modalità Demo - Simulazione attiva';
-            }
-
-            selectVoice(voiceType) {
-                document.querySelectorAll('.voice-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                document.querySelector(`[data-voice="${voiceType}"]`).classList.add('active');
-                
-                this.selectedVoice = voiceType;
-                
-                const recordingSection = document.getElementById('recordingSection');
-                recordingSection.classList.remove('disabled');
-                
-                const tip = this.voiceModels[voiceType].tip;
-                document.getElementById('recordingTip').textContent = tip;
-                
-                document.getElementById('analysisResults').classList.remove('show');
-                
-                console.log(`Selected voice: ${voiceType}`);
-            }
-
-            toggleRecording() {
-                if (this.isRecording) {
-                    this.stopRecording();
-                } else {
-                    this.startRecording();
-                }
-            }
-
-            startRecording() {
-                if (!this.selectedVoice) {
-                    alert('Seleziona prima una voce da praticare');
-                    return;
-                }
-
-                if (this.demoMode) {
-                    this.runDemoAnalysis();
-                    return;
-                }
-
-                if (!this.audioInitialized) {
-                    this.showNotification('❌ Microfono non inizializzato', 'error');
-                    return;
-                }
-
-                try {
-                    this.mediaRecorder = new MediaRecorder(this.stream);
-                    const chunks = [];
-                    
-                    this.mediaRecorder.ondataavailable = (e) => {
-                        chunks.push(e.data);
-                    };
-                    
-                    this.mediaRecorder.onstop = () => {
-                        this.analyzeRecording();
-                    };
-
-                    this.mediaRecorder.start();
-                    this.isRecording = true;
-                    this.recordingTime = 0;
-                    
-                    this.updateRecordingUI(true);
-                    this.startTimer();
-                    
-                    console.log('Recording started');
-                } catch (error) {
-                    console.error('Failed to start recording:', error);
-                    this.showNotification('❌ Errore registrazione', 'error');
-                }
-            }
-
-            stopRecording() {
-                if (!this.isRecording) return;
-                
-                this.mediaRecorder.stop();
-                this.isRecording = false;
-                
-                this.updateRecordingUI(false);
-                this.stopTimer();
-                
-                console.log('Recording stopped');
-            }
-
-            runDemoAnalysis() {
-                this.updateRecordingUI(true);
-                document.getElementById('recordingTimer').textContent = 'DEMO';
-                
-                setTimeout(() => {
-                    this.updateRecordingUI(false);
-                    this.analyzeRecording();
-                }, 3000);
-            }
-
-            updateRecordingUI(recording) {
-                const recordButton = document.getElementById('recordButton');
-                
-                if (recording) {
-                    recordButton.classList.add('recording');
-                    recordButton.textContent = '⏹️';
-                } else {
-                    recordButton.classList.remove('recording');
-                    recordButton.textContent = '🎤';
-                }
-            }
-
-            startTimer() {
-                this.recordingTimer = setInterval(() => {
-                    this.recordingTime++;
-                    const minutes = Math.floor(this.recordingTime / 60);
-                    const seconds = this.recordingTime % 60;
-                    document.getElementById('recordingTimer').textContent = 
-                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                }, 1000);
-            }
-
-            stopTimer() {
-                if (this.recordingTimer) {
-                    clearInterval(this.recordingTimer);
-                    this.recordingTimer = null;
-                }
-                document.getElementById('recordingTimer').textContent = '00:00';
-            }
-
-            async analyzeRecording() {
-                document.getElementById('loadingState').style.display = 'flex';
-                
-                try {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    
-                    const results = this.generateAnalysisResults();
-                    this.displayResults(results);
-                    
-                } catch (error) {
-                    console.error('Analysis failed:', error);
-                    this.showNotification('❌ Errore analisi', 'error');
-                } finally {
-                    document.getElementById('loadingState').style.display = 'none';
-                }
-            }
-
-            generateAnalysisResults() {
-                const confidence = 0.7 + Math.random() * 0.25;
-                const isCorrectVoice = Math.random() > 0.3;
-                const predictedVoice = isCorrectVoice ? this.selectedVoice : this.getRandomVoice();
-                
-                const comparisonData = this.generateComparisonData();
-                const feedback = this.generateFeedback(confidence, isCorrectVoice);
-                
-                return {
-                    predictedVoice,
-                    confidence,
-                    isCorrect: isCorrectVoice,
-                    comparisonData,
-                    feedback
                 };
-            }
 
-            getRandomVoice() {
-                const voices = Object.keys(this.voiceModels);
-                const filtered = voices.filter(v => v !== this.selectedVoice);
-                return filtered[Math.floor(Math.random() * filtered.length)];
-            }
-
-            generateComparisonData() {
-                const labels = ['Tono', 'Ritmo', 'Energia', 'Pause', 'Chiarezza'];
-                const targetData = [85, 90, 80, 75, 88];
-                const userData = targetData.map(value => {
-                    const variation = (Math.random() - 0.5) * 30;
-                    return Math.max(20, Math.min(100, value + variation));
-                });
-                
-                return { labels, target: targetData, user: userData };
-            }
-
-            generateFeedback(confidence, isCorrect) {
-                const strengths = [];
-                const improvements = [];
-                
-                if (confidence > 0.8) {
-                    strengths.push({
-                        title: 'Eccellente riconoscimento',
-                        description: 'Il sistema ha riconosciuto chiaramente la tua voce',
-                        score: Math.round(confidence * 100)
-                    });
+                const info = voiceInfo[voiceName];
+                if (info) {
+                    alert(`${voiceName.toUpperCase()}\n\n${info.description}\n\nCaratteristiche:\n${info.characteristics.join('\n')}\n\nEsempi disponibili: ${info.examples}`);
                 }
-                
-                if (isCorrect) {
-                    strengths.push({
-                        title: `Voce ${this.voiceModels[this.selectedVoice].name} identificata`,
-                        description: 'Hai utilizzato correttamente le caratteristiche della voce',
-                        score: 85
-                    });
-                } else {
-                    improvements.push({
-                        title: 'Lavora sulle caratteristiche distintive',
-                        description: 'Concentrati sulle caratteristiche specifiche della voce selezionata',
-                        score: 45
-                    });
-                }
-                
-                const randomImprovements = [
-                    { title: 'Migliora le pause', description: 'Prova a fare pause più significative', score: 60 },
-                    { title: 'Lavora sull\'intonazione', description: 'Sperimenta con variazioni del tono', score: 55 },
-                    { title: 'Aumenta l\'energia', description: 'Aggiungi più energia alla voce', score: 50 }
-                ];
-                
-                improvements.push(randomImprovements[Math.floor(Math.random() * randomImprovements.length)]);
-                
-                return { strengths, improvements };
-            }
-
-            displayResults(results) {
-                document.getElementById('analysisResults').classList.add('show');
-                
-                const predictedVoiceEl = document.getElementById('predictedVoice');
-                const confidenceEl = document.getElementById('confidenceScore');
-                
-                const voiceModel = this.voiceModels[results.predictedVoice];
-                predictedVoiceEl.innerHTML = `${voiceModel.icon} Voce riconosciuta: <strong>${voiceModel.name}</strong>`;
-                
-                const confidencePercent = Math.round(results.confidence * 100);
-                const confidenceClass = confidencePercent > 80 ? 'high' : confidencePercent > 60 ? 'medium' : 'low';
-                confidenceEl.className = `confidence-score ${confidenceClass}`;
-                confidenceEl.textContent = `Affidabilità: ${confidencePercent}%`;
-                
-                this.drawComparisonChart(results.comparisonData);
-                this.displayFeedback(results.feedback);
-                
-                console.log('Results displayed:', results);
-            }
-
-            drawComparisonChart(data) {
-                const canvas = document.getElementById('comparisonChart');
-                const ctx = canvas.getContext('2d');
-                
-                canvas.width = canvas.offsetWidth;
-                canvas.height = canvas.offsetHeight;
-                
-                const width = canvas.width;
-                const height = canvas.height;
-                const padding = 40;
-                const chartWidth = width - padding * 2;
-                const chartHeight = height - padding * 2;
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, width, height);
-                
-                const barWidth = chartWidth / data.labels.length / 3;
-                const barSpacing = chartWidth / data.labels.length;
-                
-                data.labels.forEach((label, index) => {
-                    const x = padding + index * barSpacing + barSpacing / 4;
-                    
-                    // Target bar
-                    const targetHeight = (data.target[index] / 100) * chartHeight;
-                    ctx.fillStyle = '#4facfe';
-                    ctx.fillRect(x, padding + chartHeight - targetHeight, barWidth, targetHeight);
-                    
-                    // User bar
-                    const userHeight = (data.user[index] / 100) * chartHeight;
-                    ctx.fillStyle = '#ff6b6b';
-                    ctx.fillRect(x + barWidth + 5, padding + chartHeight - userHeight, barWidth, userHeight);
-                    
-                    // Label
-                    ctx.fillStyle = '#374151';
-                    ctx.font = '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(label, x + barWidth + 2.5, height - 10);
-                });
-            }
-
-            displayFeedback(feedback) {
-                const strengthsContainer = document.getElementById('strengthsFeedback');
-                strengthsContainer.innerHTML = '';
-                
-                feedback.strengths.forEach(item => {
-                    const feedbackItem = document.createElement('div');
-                    feedbackItem.innerHTML = `
-                        <div style="font-weight: 600; margin-bottom: 5px;">${item.title}</div>
-                        <div style="font-size: 0.9em; color: #666;">${item.description}</div>
-                        <div style="float: right; background: #f59e0b; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">${item.score}%</div>
-                    `;
-                    improvementsContainer.appendChild(feedbackItem);
-                });
-            }
-
-            recordAgain() {
-                document.getElementById('analysisResults').classList.remove('show');
-            }
-
-            changeVoice() {
-                document.querySelectorAll('.voice-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                
-                this.selectedVoice = null;
-                document.getElementById('recordingSection').classList.add('disabled');
-                document.getElementById('analysisResults').classList.remove('show');
-                document.getElementById('recordingTip').textContent = 'Seleziona una voce per iniziare';
-            }
-
-            showNotification(message, type = 'info', duration = 5000) {
-                const notification = document.createElement('div');
-                notification.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    background: ${type === 'success' ? '#d1fae5' : type === 'error' ? '#fee2e2' : '#e0f2fe'};
-                    color: ${type === 'success' ? '#065f46' : type === 'error' ? '#991b1b' : '#0c4a6e'};
-                    padding: 15px 20px;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    max-width: 400px;
-                    z-index: 10001;
-                    transform: translateX(100%);
-                    transition: transform 0.3s ease;
-                    border-left: 4px solid ${type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : '#3b82f6'};
-                `;
-                notification.textContent = message;
-                
-                document.body.appendChild(notification);
-                
-                setTimeout(() => {
-                    notification.style.transform = 'translateX(0)';
-                }, 100);
-                
-                setTimeout(() => {
-                    notification.style.transform = 'translateX(100%)';
-                    setTimeout(() => {
-                        if (notification.parentNode) {
-                            notification.parentNode.removeChild(notification);
-                        }
-                    }, 300);
-                }, duration);
             }
         }
 
-        // Initialize app when DOM is loaded
+        // Inizializza l'applicazione
         document.addEventListener('DOMContentLoaded', () => {
-            new VoiceBreakApp();
+            new VoiceBreakHome();
+        });
+
+        // Nasconde il loading quando la pagina è completamente caricata
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }, 500);
         });
     </script>
 </body>
 </html>
-                    feedbackItem.innerHTML = `
-                        <div style="font-weight: 600; margin-bottom: 5px;">${item.title}</div>
-                        <div style="font-size: 0.9em; color: #666;">${item.description}</div>
-                        <div style="float: right; background: #4facfe; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">${item.score}%</div>
-                    `;
-                    strengthsContainer.appendChild(feedbackItem);
-                });
-                
-                const improvementsContainer = document.getElementById('improvementsFeedback');
-                improvementsContainer.innerHTML = '';
-                
-                feedback.improvements.forEach(item => {
-                    const feedbackItem = document.createElement('div');
-                    feedbackItem.className = 'feedback-item';

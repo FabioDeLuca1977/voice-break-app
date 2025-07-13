@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Break AI - Pannello Developer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.1);
+            padding: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Upload Section */
+        .upload-area {
+            border: 3px dashed #e74c3c;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #fdf2f2;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .upload-area.drag-over {
+            background: #f8e6e6;
+            border-color: #c0392b;
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+        }
+
+        .voice-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .voice-option {
+            background: #f8f9fa;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .voice-option.selected {
+            border-color: #e74c3c;
+            background: #fdf2f2;
+        }
+
+        .voice-option:hover {
+            background: #e9ecef;
+        }
+
+        .voice-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* File Manager */
+        .file-manager {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            border-bottom: 1px solid #f1f3f4;
+            transition: background 0.2s ease;
+        }
+
+        .file-item:hover {
+            background: #f8f9fa;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 1.5em;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .file-meta {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            background: none;
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: #f8f9fa;
+        }
+
+        .action-btn.play {
+            color: #28a745;
+            border-color: #28a745;
+        }
+
+        .action-btn.delete {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        /* Model Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #e74c3c;
+            display: block;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        /* Training Controls */
+        .training-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            min-width: 200px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .train-btn {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .train-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+        }
+
+        .train-btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Console */
+        .console {
+            background: #1e1e1e;
+            color: #f8f8f2;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .console-line {
+            margin-bottom: 5px;
+        }
+
+        .console-timestamp {
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .console-info { color: #66d9ef; }
+        .console-success { color: #a6e22e; }
+        .console-warning { color: #f92672; }
+        .console-error { color: #fd971f; }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .voice-selector {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .training-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .progress-bar {
+                min-width: auto;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .training .stat-number {
+            animation: pulse 1.5s infinite;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left: 4px solid #27ae60;
+        }
+
+        .notification.error {
+            border-left: 4px solid #e74c3c;
+        }
+
+        .notification.warning {
+            border-left: 4px solid #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚙️ Pannello Developer - Motore ML</h1>
+        <a href="index.html" class="back-btn">← Home</a>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-grid">
+            <!-- Upload Section -->
+            <div class="panel">
+                <h2 class="panel-title">📤 Upload Esempi Audio</h2>
+                
+                <div class="voice-selector">
+                    <div class="voice-option" data-voice="aria">
+                        <span class="voice-icon">🌬️</span>
+                        <div>Aria</div>
+                    </div>
+                    <div class="voice-option" data-voice="acqua">
+                        <span class="voice-icon">💧</span>
+                        <div>Acqua</div>
+                    </div>
+                    <div class="voice-option" data-voice="terra">
+                        <span class="voice-icon">🌍</span>
+                        <div>Terra</div>
+                    </div>
+                    <div class="voice-option" data-voice="fuoco">
+                        <span class="voice-icon">🔥</span>
+                        <div>Fuoco</div>
+                    </div>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div style="font-size: 3em; margin-bottom: 15px;">🎤</div>
+                    <h3>Trascina i file audio qui</h3>
+                    <p style="color: #666; margin: 10px 0;">o clicca per selezionare</p>
+                    <p style="font-size: 0.9em; color: #999;">Formati supportati: MP3, WAV, M4A</p>
+                    
+                    <input type="file" id="audioFileInput" multiple accept=".mp3,.wav,.m4a">
+                    <button class="upload-btn" onclick="document.getElementById('audioFileInput').click()">
+                        Seleziona File
+                    </button>
+                </div>
+
+                <div id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="uploadProgressFill"></div>
+                    </div>
+                    <p style="text-align: center; margin-top: 10px; color: #666;" id="uploadStatus">
+                        Caricamento in corso...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Model Statistics -->
+            <div class="panel">
+                <h2 class="panel-title">📊 Statistiche Modello</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-number" id="ariaCount">247</span>
+                        <div class="stat-label">Aria</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="acquaCount">312</span>
+                        <div class="stat-label">Acqua</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="terraCount">298</span>
+                        <div class="stat-label">Terra</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="fuocoCount">390</span>
+                        <div class="stat-label">Fuoco</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="totalSamples">1,247</span>
+                        <div class="stat-label">Totale</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="modelAccuracy">94%</span>
+                        <div class="stat-label">Accuratezza</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Manager -->
+            <div class="panel full-width">
+                <h2 class="panel-title">📁 Gestione Database Audio</h2>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <select id="voiceFilter" style="padding: 10px; border-radius: 8px; border: 1px solid #dee2e6;">
+                            <option value="all">Tutte le voci</option>
+                            <option value="aria">🌬️ Aria</option>
+                            <option value="acqua">💧 Acqua</option>
+                            <option value="terra">🌍 Terra</option>
+                            <option value="fuoco">🔥 Fuoco</option>
+                        </select>
+                        
+                        <input type="search" id="searchFiles" placeholder="Cerca file..." 
+                               style="padding: 10px; border-radius: 8px; border: 1px solid #dee2e6; width: 250px;">
+                    </div>
+                    
+                    <button class="action-btn" onclick="refreshFileList()">🔄 Aggiorna</button>
+                </div>
+
+                <div class="file-manager" id="fileManager">
+                    <!-- File list will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Training Controls -->
+            <div class="panel">
+                <h2 class="panel-title">🤖 Controlli Training</h2>
+                
+                <div class="training-controls">
+                    <button class="train-btn" id="trainButton" onclick="startTraining()">
+                        🚀 Avvia Training
+                    </button>
+                    
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="trainingProgress"></div>
+                    </div>
+                    
+                    <span id="trainingStatus">Pronto</span>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">Parametri Training:</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <label style="font-size: 0.9em; color: #666;">Batch Size:</label>
+                            <input type="number" id="batchSize" value="32" min="16" max="128" 
+                                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #dee2e6;">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.9em; color: #666;">Learning Rate:</label>
+                            <input type="number" id="learningRate" value="0.001" step="0.0001" min="0.0001" max="0.1"
+                                   style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #dee2e6;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Console Log -->
+            <div class="panel">
+                <h2 class="panel-title">📺 Console</h2>
+                <div class="console" id="console">
+                    <div class="console-line">
+                        <span class="console-timestamp">[14:32:15]</span>
+                        <span class="console-info">Sistema inizializzato</span>
+                    </div>
+                    <div class="console-line">
+                        <span class="console-timestamp">[14:32:16]</span>
+                        <span class="console-success">Database audio caricato: 1,247 campioni</span>
+                    </div>
+                    <div class="console-line">
+                        <span class="console-timestamp">[14:32:17]</span>
+                        <span class="console-info">Modello ML pronto per training</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VoiceBreakDeveloper {
+            constructor() {
+                this.selectedVoice = null;
+                this.isTraining = false;
+                this.audioDatabase = new Map();
+                this.modelStats = {
+                    aria: 247,
+                    acqua: 312,
+                    terra: 298,
+                    fuoco: 390,
+                    accuracy: 94
+                };
+                
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.loadAudioDatabase();
+                this.populateFileManager();
+                this.log('Sistema Developer inizializzato', 'success');
+            }
+
+            setupEventListeners() {
+                // Voice selection
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        this.selectVoice(option.dataset.voice);
+                    });
+                });
+
+                // File upload
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('audioFileInput');
+
+                // Drag and drop
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('drag-over');
+                });
+
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('drag-over');
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    this.handleFileUpload(files);
+                });
+
+                // File input change
+                fileInput.addEventListener('change', (e) => {
+                    this.handleFileUpload(e.target.files);
+                });
+
+                // File manager filters
+                document.getElementById('voiceFilter').addEventListener('change', () => {
+                    this.filterFiles();
+                });
+
+                document.getElementById('searchFiles').addEventListener('input', () => {
+                    this.filterFiles();
+                });
+            }
+
+            selectVoice(voiceType) {
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                document.querySelector(`[data-voice="${voiceType}"]`).classList.add('selected');
+                this.selectedVoice = voiceType;
+                
+                this.log(`Voce selezionata: ${voiceType}`, 'info');
+            }
+
+            async handleFileUpload(files) {
+                if (!this.selectedVoice) {
+                    this.showNotification('Seleziona prima una voce di destinazione', 'warning');
+                    return;
+                }
+
+                const audioFiles = Array.from(files).filter(file => 
+                    file.type.startsWith('audio/') || 
+                    /\.(mp3|wav|m4a)$/i.test(file.name)
+                );
+
+                if (audioFiles.length === 0) {
+                    this.showNotification('Nessun file audio valido selezionato', 'error');
+                    return;
+                }
+
+                this.log(`Caricamento ${audioFiles.length} file per voce: ${this.selectedVoice}`, 'info');
+                
+                // Show progress
+                document.getElementById('uploadProgress').style.display = 'block';
+                const progressFill = document.getElementById('uploadProgressFill');
+                const statusText = document.getElementById('uploadStatus');
+
+                for (let i = 0; i < audioFiles.length; i++) {
+                    const file = audioFiles[i];
+                    const progress = ((i + 1) / audioFiles.length) * 100;
+                    
+                    progressFill.style.width = progress + '%';
+                    statusText.textContent = `Caricamento ${file.name} (${i + 1}/${audioFiles.length})`;
+                    
+                    await this.processAudioFile(file);
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate processing time
+                }
+
+                // Hide progress and update stats
+                document.getElementById('uploadProgress').style.display = 'none';
+                this.updateStats();
+                this.populateFileManager();
+                
+                this.showNotification(`${audioFiles.length} file caricati con successo`, 'success');
+                this.log(`Upload completato: ${audioFiles.length} file aggiunti alla voce ${this.selectedVoice}`, 'success');
+            }
+
+            async processAudioFile(file) {
+                const audioData = {
+                    id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                    name: file.name,
+                    voice: this.selectedVoice,
+                    size: file.size,
+                    type: file.type,
+                    uploadDate: new Date(),
+                    processed: false,
+                    features: null
+                };
+
+                // Simulate audio processing
+                await this.extractAudioFeatures(file, audioData);
+                
+                // Store in database
+                if (!this.audioDatabase.has(this.selectedVoice)) {
+                    this.audioDatabase.set(this.selectedVoice, []);
+                }
+                
+                this.audioDatabase.get(this.selectedVoice).push(audioData);
+                this.modelStats[this.selectedVoice]++;
+            }
+
+            async extractAudioFeatures(file, audioData) {
+                // Simulate feature extraction
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        audioData.features = {
+                            duration: Math.random() * 10 + 2, // 2-12 seconds
+                            pitch: Math.random() * 100 + 50,  // 50-150 Hz
+                            energy: Math.random() * 100,      // 0-100%
+                            spectralCentroid: Math.random() * 5000 + 1000, // 1000-6000 Hz
+                            mfcc: Array.from({length: 13}, () => Math.random() * 2 - 1) // MFCC coefficients
+                        };
+                        audioData.processed = true;
+                        resolve();
+                    }, 200);
+                });
+            }
+
+            populateFileManager() {
+                const fileManager = document.getElementById('fileManager');
+                fileManager.innerHTML = '';
+
+                let allFiles = [];
+                for (const [voice, files] of this.audioDatabase) {
+                    allFiles = allFiles.concat(files.map(file => ({...file, voice})));
+                }
+
+                // Sort by upload date (newest first)
+                allFiles.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+
+                allFiles.forEach(file => {
+                    const fileItem = this.createFileItem(file);
+                    fileManager.appendChild(fileItem);
+                });
+
+                if (allFiles.length === 0) {
+                    fileManager.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <div style="font-size: 3em; margin-bottom: 15px;">📂</div>
+                            <p>Nessun file caricato</p>
+                            <p style="font-size: 0.9em; margin-top: 5px;">Carica i primi esempi audio per iniziare</p>
+                        </div>
+                    `;
+                }
+            }
+
+            createFileItem(file) {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.dataset.voice = file.voice;
+                item.dataset.name = file.name.toLowerCase();
+
+                const voiceIcons = {
+                    aria: '🌬️',
+                    acqua: '💧', 
+                    terra: '🌍',
+                    fuoco: '🔥'
+                };
+
+                const formatFileSize = (bytes) => {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                };
+
+                const formatDate = (date) => {
+                    return new Date(date).toLocaleString('it-IT', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                };
+
+                item.innerHTML = `
+                    <div class="file-info">
+                        <span class="file-icon">${voiceIcons[file.voice]}</span>
+                        <div class="file-details">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">
+                                ${file.voice.toUpperCase()} • ${formatFileSize(file.size)} • ${formatDate(file.uploadDate)}
+                                ${file.features ? ` • ${file.features.duration.toFixed(1)}s` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="action-btn play" onclick="playAudio('${file.id}')">▶️ Play</button>
+                        <button class="action-btn" onclick="analyzeFile('${file.id}')">📊 Analizza</button>
+                        <button class="action-btn delete" onclick="deleteFile('${file.id}')">🗑️ Elimina</button>
+                    </div>
+                `;
+
+                return item;
+            }
+
+            filterFiles() {
+                const voiceFilter = document.getElementById('voiceFilter').value;
+                const searchTerm = document.getElementById('searchFiles').value.toLowerCase();
+                const fileItems = document.querySelectorAll('.file-item');
+
+                fileItems.forEach(item => {
+                    const matchesVoice = voiceFilter === 'all' || item.dataset.voice === voiceFilter;
+                    const matchesSearch = searchTerm === '' || item.dataset.name.includes(searchTerm);
+                    
+                    item.style.display = (matchesVoice && matchesSearch) ? 'flex' : 'none';
+                });
+            }
+
+            async startTraining() {
+                if (this.isTraining) {
+                    this.showNotification('Training già in corso', 'warning');
+                    return;
+                }
+
+                const totalSamples = Object.values(this.modelStats).slice(0, 4).reduce((a, b) => a + b, 0);
+                if (totalSamples < 100) {
+                    this.showNotification('Servono almeno 100 campioni totali per il training', 'error');
+                    return;
+                }
+
+                this.isTraining = true;
+                const trainButton = document.getElementById('trainButton');
+                const progressBar = document.getElementById('trainingProgress');
+                const statusText = document.getElementById('trainingStatus');
+
+                trainButton.disabled = true;
+                trainButton.textContent = '🔄 Training...';
+                
+                this.log('Avvio training del modello ML', 'info');
+                this.log(`Parametri: Batch Size=${document.getElementById('batchSize').value}, Learning Rate=${document.getElementById('learningRate').value}`, 'info');
+
+                // Simulate training process
+                const epochs = 50;
+                for (let epoch = 1; epoch <= epochs; epoch++) {
+                    const progress = (epoch / epochs) * 100;
+                    progressBar.style.width = progress + '%';
+                    statusText.textContent = `Epoch ${epoch}/${epochs}`;
+                    
+                    if (epoch % 10 === 0) {
+                        const accuracy = Math.min(94 + Math.random() * 6, 99);
+                        this.log(`Epoch ${epoch}: Accuracy ${accuracy.toFixed(2)}%`, 'success');
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                // Training completed
+                this.isTraining = false;
+                trainButton.disabled = false;
+                trainButton.textContent = '🚀 Avvia Training';
+                statusText.textContent = 'Training completato';
+                
+                // Update model accuracy
+                this.modelStats.accuracy = Math.min(this.modelStats.accuracy + Math.random() * 3, 99);
+                this.updateStats();
+                
+                this.log('Training completato con successo', 'success');
+                this.log(`Nuova accuratezza modello: ${this.modelStats.accuracy.toFixed(1)}%`, 'success');
+                this.showNotification('Training completato! Modello aggiornato', 'success');
+            }
+
+            updateStats() {
+                document.getElementById('ariaCount').textContent = this.modelStats.aria;
+                document.getElementById('acquaCount').textContent = this.modelStats.acqua;
+                document.getElementById('terraCount').textContent = this.modelStats.terra;
+                document.getElementById('fuocoCount').textContent = this.modelStats.fuoco;
+                
+                const total = this.modelStats.aria + this.modelStats.acqua + this.modelStats.terra + this.modelStats.fuoco;
+                document.getElementById('totalSamples').textContent = total.toLocaleString();
+                document.getElementById('modelAccuracy').textContent = this.modelStats.accuracy.toFixed(1) + '%';
+            }
+
+            loadAudioDatabase() {
+                // Load existing database from localStorage or initialize empty
+                const saved = localStorage.getItem('voiceBreakAudioDB');
+                if (saved) {
+                    try {
+                        const data = JSON.parse(saved);
+                        this.audioDatabase = new Map(Object.entries(data.database || {}));
+                        this.modelStats = { ...this.modelStats, ...data.stats };
+                        this.log('Database audio caricato dal storage locale', 'info');
+                    } catch (error) {
+                        this.log('Errore caricamento database, inizializzazione nuova istanza', 'warning');
+                        this.initializeEmptyDatabase();
+                    }
+                } else {
+                    this.initializeEmptyDatabase();
+                }
+                
+                this.updateStats();
+            }
+
+            initializeEmptyDatabase() {
+                // Initialize with some sample data for demo
+                this.audioDatabase = new Map([
+                    ['aria', []],
+                    ['acqua', []],
+                    ['terra', []],
+                    ['fuoco', []]
+                ]);
+                
+                // Add some demo files for testing
+                this.addDemoFiles();
+                this.saveDatabase();
+            }
+
+            addDemoFiles() {
+                const demoFiles = [
+                    { voice: 'aria', name: 'aria_example_01.wav', size: 245760 },
+                    { voice: 'aria', name: 'aria_example_02.mp3', size: 189440 },
+                    { voice: 'acqua', name: 'acqua_sample_01.wav', size: 312320 },
+                    { voice: 'terra', name: 'terra_training_01.mp3', size: 198560 },
+                    { voice: 'fuoco', name: 'fuoco_demo_01.wav', size: 267840 }
+                ];
+
+                demoFiles.forEach((demo, index) => {
+                    const audioData = {
+                        id: 'demo-' + index,
+                        name: demo.name,
+                        voice: demo.voice,
+                        size: demo.size,
+                        type: demo.name.endsWith('.wav') ? 'audio/wav' : 'audio/mpeg',
+                        uploadDate: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+                        processed: true,
+                        features: {
+                            duration: Math.random() * 8 + 3,
+                            pitch: Math.random() * 100 + 80,
+                            energy: Math.random() * 80 + 20,
+                            spectralCentroid: Math.random() * 3000 + 2000,
+                            mfcc: Array.from({length: 13}, () => Math.random() * 2 - 1)
+                        }
+                    };
+                    
+                    this.audioDatabase.get(demo.voice).push(audioData);
+                });
+            }
+
+            saveDatabase() {
+                try {
+                    const data = {
+                        database: Object.fromEntries(this.audioDatabase),
+                        stats: this.modelStats,
+                        lastUpdate: new Date().toISOString()
+                    };
+                    localStorage.setItem('voiceBreakAudioDB', JSON.stringify(data));
+                } catch (error) {
+                    this.log('Errore salvataggio database: ' + error.message, 'error');
+                }
+            }
+
+            log(message, type = 'info') {
+                const console = document.getElementById('console');
+                const timestamp = new Date().toLocaleTimeString('it-IT');
+                
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.innerHTML = `
+                    <span class="console-timestamp">[${timestamp}]</span>
+                    <span class="console-${type}">${message}</span>
+                `;
+                
+                console.appendChild(line);
+                console.scrollTop = console.scrollHeight;
+                
+                // Keep only last 100 lines
+                while (console.children.length > 100) {
+                    console.removeChild(console.firstChild);
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                // Show notification
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                // Hide and remove notification
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 4000);
+            }
+        }
+
+        // Global functions for file actions
+        function playAudio(fileId) {
+            app.log(`Riproduzione audio: ${fileId}`, 'info');
+            app.showNotification('Riproduzione audio simulata', 'info');
+        }
+
+        function analyzeFile(fileId) {
+            app.log(`Analisi file: ${fileId}`, 'info');
+            app.showNotification('Analisi features audio in corso...', 'info');
+            
+            // Simulate analysis
+            setTimeout(() => {
+                app.showNotification('Analisi completata', 'success');
+                app.log('Analisi features completata', 'success');
+            }, 2000);
+        }
+
+        function deleteFile(fileId) {
+            if (confirm('Sei sicuro di voler eliminare questo file?')) {
+                // Find and remove file from database
+                for (const [voice, files] of app.audioDatabase) {
+                    const fileIndex = files.findIndex(f => f.id === fileId);
+                    if (fileIndex !== -1) {
+                        files.splice(fileIndex, 1);
+                        app.modelStats[voice]--;
+                        break;
+                    }
+                }
+                
+                app.updateStats();
+                app.populateFileManager();
+                app.saveDatabase();
+                app.log(`File eliminato: ${fileId}`, 'warning');
+                app.showNotification('File eliminato', 'success');
+            }
+        }
+
+        function refreshFileList() {
+            app.populateFileManager();
+            app.log('Lista file aggiornata', 'info');
+            app.showNotification('Lista file aggiornata', 'info');
+        }
+
+        function startTraining() {
+            app.startTraining();
+        }
+
+        // Initialize the application
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new VoiceBreakDeveloper();
+        });
+
+        // Auto-save database every 30 seconds
+        setInterval(() => {
+            if (app) {
+                app.saveDatabase();
+            }
+        }, 30000);
+
+        // Save database before page unload
+        window.addEventListener('beforeunload', () => {
+            if (app) {
+                app.saveDatabase();
+            }
+        });
+    </script>
+</body>
+</html>
