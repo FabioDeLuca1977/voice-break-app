@@ -266,7 +266,7 @@
 
         .waveform-canvas {
             width: 100%;
-            height: 150px;
+            height: 180px;
             border: 1px solid #dee2e6;
             border-radius: 8px;
             background: white;
@@ -277,6 +277,7 @@
             justify-content: center;
             gap: 15px;
             margin-top: 15px;
+            flex-wrap: wrap;
         }
 
         .waveform-btn {
@@ -357,6 +358,10 @@
             .correction-buttons {
                 flex-direction: column;
             }
+            
+            .waveform-controls {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .notification {
@@ -431,10 +436,10 @@
                     <h4>📈 Analisi Forme d'Onda</h4>
                     <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
                     <div class="waveform-controls">
-                        <button class="waveform-btn" onclick="showWaveform('aria')">🌬️ Aria Pattern</button>
-                        <button class="waveform-btn" onclick="showWaveform('acqua')">💧 Acqua Pattern</button>
-                        <button class="waveform-btn" onclick="showWaveform('terra')">🌍 Terra Pattern</button>
-                        <button class="waveform-btn" onclick="showWaveform('fuoco')">🔥 Fuoco Pattern</button>
+                        <button class="waveform-btn" onclick="showWaveform('aria')">🌬️ Aria</button>
+                        <button class="waveform-btn" onclick="showWaveform('acqua')">💧 Acqua</button>
+                        <button class="waveform-btn" onclick="showWaveform('terra')">🌍 Terra</button>
+                        <button class="waveform-btn" onclick="showWaveform('fuoco')">🔥 Fuoco</button>
                     </div>
                     <p style="font-size: 0.9em; color: #666; margin-top: 10px;" id="waveformDescription">
                         Clicca sui pulsanti per vedere i pattern caratteristici di ogni voce
@@ -512,7 +517,7 @@
             <div class="panel full-width">
                 <h2 class="panel-title">✅ Coda di Validazione</h2>
                 
-                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <p style="color: #666;">Correggi le predizioni del modello per migliorare l'accuratezza</p>
                     <button class="waveform-btn" onclick="generateNewSamples()">🔄 Genera Nuovi Campioni</button>
                 </div>
@@ -858,6 +863,8 @@
                 const width = canvas.width;
                 const height = canvas.height;
                 const centerY = height / 2;
+                const margin = 40; // Margini per evitare che l'onda esca
+                const maxAmplitude = (height / 2) - margin; // Ampiezza massima sicura
                 
                 // Clear canvas
                 ctx.fillStyle = '#ffffff';
@@ -874,50 +881,75 @@
                     ctx.stroke();
                 }
                 
+                // Draw center line
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset line dash
+                
                 // Draw waveform based on voice type
                 ctx.strokeStyle = '#f39c12';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
                 
                 const points = 200;
+                const leftMargin = 20;
+                const rightMargin = 20;
+                const drawWidth = width - leftMargin - rightMargin;
+                
                 for (let i = 0; i < points; i++) {
-                    const x = (width / points) * i;
+                    const x = leftMargin + (drawWidth / points) * i;
                     const progress = i / points;
-                    let y = centerY;
+                    let amplitude = 0; // Normalized amplitude (-1 to 1)
                     
                     switch(voiceType) {
                         case 'aria':
                             // Ascending pattern with multiple rises
-                            y = centerY + Math.sin(progress * Math.PI * 4) * 30 - (progress * 40);
+                            amplitude = Math.sin(progress * Math.PI * 4) * 0.6 - (progress * 0.8);
                             if (progress > 0.7) {
-                                y += Math.sin(progress * Math.PI * 12) * 15; // Final rises
+                                amplitude += Math.sin(progress * Math.PI * 12) * 0.3; // Final rises
                             }
+                            // Clamp to safe range
+                            amplitude = Math.max(-0.9, Math.min(0.3, amplitude));
                             break;
                             
                         case 'acqua':
                             // Descending with trails (puntini)
-                            y = centerY - Math.sin(progress * Math.PI * 2) * 20 + (progress * 35);
+                            amplitude = -Math.sin(progress * Math.PI * 2) * 0.4 + (progress * 0.7);
                             if (progress > 0.8) {
                                 // Add trails at the end
-                                y += Math.sin(progress * Math.PI * 20) * 10;
+                                amplitude += Math.sin(progress * Math.PI * 20) * 0.2;
                             }
+                            // Clamp to safe range
+                            amplitude = Math.max(-0.3, Math.min(0.9, amplitude));
                             break;
                             
                         case 'terra':
                             // Clean descending, sharp endings
-                            y = centerY + Math.sin(progress * Math.PI * 3) * 25 + (progress * 30);
+                            amplitude = Math.sin(progress * Math.PI * 3) * 0.5 + (progress * 0.6);
                             if (progress > 0.9) {
                                 // Sharp cut-off
-                                y = centerY + 40;
+                                amplitude = 0.8;
                             }
+                            // Clamp to safe range
+                            amplitude = Math.max(-0.2, Math.min(0.8, amplitude));
                             break;
                             
                         case 'fuoco':
                             // High energy, fast rhythm
-                            y = centerY + Math.sin(progress * Math.PI * 8) * 35;
-                            y += Math.sin(progress * Math.PI * 16) * 15; // High frequency
+                            amplitude = Math.sin(progress * Math.PI * 8) * 0.7;
+                            amplitude += Math.sin(progress * Math.PI * 16) * 0.3; // High frequency
+                            // Clamp to safe range
+                            amplitude = Math.max(-0.8, Math.min(0.8, amplitude));
                             break;
                     }
+                    
+                    // Convert amplitude to canvas coordinates
+                    const y = centerY + (amplitude * maxAmplitude);
                     
                     if (i === 0) {
                         ctx.moveTo(x, y);
@@ -928,44 +960,51 @@
                 
                 ctx.stroke();
                 
-                // Add voice-specific markers
-                this.addVoiceMarkers(ctx, voiceType, width, height, centerY);
+                // Add voice-specific markers with better positioning
+                this.addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude);
                 
                 // Update description
                 const description = this.voicePatterns[voiceType].description;
                 document.getElementById('waveformDescription').textContent = description;
             }
 
-            addVoiceMarkers(ctx, voiceType, width, height, centerY) {
-                ctx.font = '12px Arial';
+            addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude) {
+                ctx.font = '11px Arial';
                 ctx.fillStyle = '#e67e22';
+                ctx.textAlign = 'center';
+                
+                const safeTopY = centerY - maxAmplitude + 15;
+                const safeBottomY = centerY + maxAmplitude - 5;
                 
                 switch(voiceType) {
                     case 'aria':
                         // Mark the ascending sections
-                        ctx.fillText('↗️ Salite', width * 0.2, centerY - 50);
-                        ctx.fillText('↗️ Aperture', width * 0.5, centerY - 60);
-                        ctx.fillText('↗️ Crescendo', width * 0.8, centerY - 70);
+                        ctx.fillText('↗️ Salite', width * 0.25, safeTopY);
+                        ctx.fillText('↗️ Aperture', width * 0.5, safeTopY - 10);
+                        ctx.fillText('↗️ Crescendo', width * 0.8, safeTopY);
                         break;
                         
                     case 'acqua':
                         // Mark descending and trails
-                        ctx.fillText('↘️ Discesa fluida', width * 0.3, centerY - 30);
-                        ctx.fillText('~~~~ Puntini finali', width * 0.8, centerY + 40);
+                        ctx.fillText('↘️ Discesa fluida', width * 0.35, safeTopY);
+                        ctx.fillText('~~~~ Puntini finali', width * 0.8, safeBottomY);
                         break;
                         
                     case 'terra':
                         // Mark structured descent and clean ending
-                        ctx.fillText('↘️ Discesa strutturata', width * 0.4, centerY - 35);
-                        ctx.fillText('✂️ Taglio netto', width * 0.9, centerY + 50);
+                        ctx.fillText('↘️ Discesa strutturata', width * 0.4, safeTopY);
+                        ctx.fillText('✂️ Taglio netto', width * 0.85, safeBottomY);
                         break;
                         
                     case 'fuoco':
                         // Mark energy and rhythm
-                        ctx.fillText('⚡ Alta energia', width * 0.2, centerY - 45);
-                        ctx.fillText('🔥 Ritmo incalzante', width * 0.6, centerY - 50);
+                        ctx.fillText('⚡ Alta energia', width * 0.25, safeTopY);
+                        ctx.fillText('🔥 Ritmo incalzante', width * 0.75, safeTopY);
                         break;
                 }
+                
+                // Reset text alignment
+                ctx.textAlign = 'start';
             }
 
             showNotification(message, type = 'info') {
