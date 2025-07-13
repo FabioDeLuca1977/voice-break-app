@@ -48,14 +48,14 @@
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
             padding: 30px;
         }
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 30px;
             margin-bottom: 30px;
         }
@@ -81,7 +81,11 @@
             grid-column: 1 / -1;
         }
 
-        /* Recording Section */
+        .half-width {
+            grid-column: span 2;
+        }
+
+        /* Test Recording Section */
         .recording-area {
             text-align: center;
             padding: 30px;
@@ -122,6 +126,39 @@
             display: block;
         }
 
+        /* AI Analysis Section */
+        .ai-recording-area {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #e8f4fd 0%, #f0f9ff 100%);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #3498db;
+        }
+
+        .ai-record-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            font-size: 3em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+        }
+
+        .ai-record-button:hover {
+            transform: scale(1.05);
+        }
+
+        .ai-record-button.recording {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            animation: pulse 1.5s infinite;
+        }
+
         .record-button {
             width: 100px;
             height: 100px;
@@ -155,6 +192,191 @@
             color: #333;
             margin: 10px 0;
             font-family: 'Courier New', monospace;
+        }
+
+        /* Voice Analysis Results */
+        .voice-analysis {
+            margin-top: 20px;
+        }
+
+        .voice-percentage {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid transparent;
+        }
+
+        .voice-percentage.highest {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .voice-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .percentage-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            flex: 1;
+            margin: 0 15px;
+            overflow: hidden;
+        }
+
+        .percentage-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .percentage-fill.aria {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+        }
+
+        .percentage-fill.acqua {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+        }
+
+        .percentage-fill.terra {
+            background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+        }
+
+        .percentage-fill.fuoco {
+            background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+        }
+
+        .percentage-value {
+            font-weight: 700;
+            font-size: 1.1em;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        /* Recorded Waveform */
+        .recorded-waveform {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .recorded-canvas {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .waveform-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .waveform-btn {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .waveform-btn:hover {
+            background: #e67e22;
+        }
+
+        .waveform-btn.ai-btn {
+            background: #3498db;
+        }
+
+        .waveform-btn.ai-btn:hover {
+            background: #2980b9;
+        }
+
+        /* Reference Waveforms */
+        .waveform-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .waveform-canvas {
+            width: 100%;
+            height: 180px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #f39c12;
+            display: block;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        /* Progress indicators */
+        .accuracy-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .accuracy-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8em;
+            font-weight: 600;
         }
 
         /* Validation Section */
@@ -255,96 +477,14 @@
             background: #fef9e7;
         }
 
-        /* Waveform Visualization */
-        .waveform-container {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .waveform-canvas {
-            width: 100%;
-            height: 180px;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            background: white;
-        }
-
-        .waveform-controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-
-        .waveform-btn {
-            background: #f39c12;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .waveform-btn:hover {
-            background: #e67e22;
-        }
-
-        /* Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 20px;
-        }
-
-        .stat-card {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 2em;
-            font-weight: 700;
-            color: #f39c12;
-            display: block;
-        }
-
-        .stat-label {
-            color: #666;
-            font-size: 0.9em;
-            margin-top: 5px;
-        }
-
-        /* Progress indicators */
-        .accuracy-bar {
-            background: #e9ecef;
-            border-radius: 10px;
-            height: 20px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-
-        .accuracy-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.8em;
-            font-weight: 600;
-        }
-
         /* Responsive */
-        @media (max-width: 1200px) {
+        @media (max-width: 1400px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 1000px) {
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
@@ -392,19 +532,28 @@
         .notification.warning {
             border-left: 4px solid #f39c12;
         }
+
+        .analyzing {
+            animation: analyzing 2s infinite;
+        }
+
+        @keyframes analyzing {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🎓 Pannello Trainer - Validazione e Correzione</h1>
+        <h1>🎓 Pannello Trainer Avanzato - Analisi AI Real-time</h1>
         <a href="index.html" class="back-btn">← Home</a>
     </div>
 
     <div class="container">
         <div class="dashboard-grid">
-            <!-- Recording & Testing -->
+            <!-- Test Recording with Voice Selection -->
             <div class="panel">
-                <h2 class="panel-title">🎤 Test Recording</h2>
+                <h2 class="panel-title">🎤 Test Mirato</h2>
                 
                 <div class="voice-selector">
                     <div class="voice-option" data-voice="aria">
@@ -430,20 +579,67 @@
                     <button class="record-button" id="recordButton">🎤</button>
                     <div class="recording-timer" id="recordingTimer">00:00</div>
                 </div>
+            </div>
 
-                <!-- Waveform Visualization -->
-                <div class="waveform-container">
-                    <h4>📈 Analisi Forme d'Onda</h4>
-                    <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
-                    <div class="waveform-controls">
-                        <button class="waveform-btn" onclick="showWaveform('aria')">🌬️ Aria</button>
-                        <button class="waveform-btn" onclick="showWaveform('acqua')">💧 Acqua</button>
-                        <button class="waveform-btn" onclick="showWaveform('terra')">🌍 Terra</button>
-                        <button class="waveform-btn" onclick="showWaveform('fuoco')">🔥 Fuoco</button>
-                    </div>
-                    <p style="font-size: 0.9em; color: #666; margin-top: 10px;" id="waveformDescription">
-                        Clicca sui pulsanti per vedere i pattern caratteristici di ogni voce
+            <!-- AI Analysis Recording -->
+            <div class="panel">
+                <h2 class="panel-title">🤖 Analisi AI Automatica</h2>
+                
+                <div class="ai-recording-area">
+                    <h4>Registra e lascia che l'AI analizzi</h4>
+                    <p style="color: #666; margin-bottom: 20px;">
+                        Il modello determinerà automaticamente le percentuali delle 4 voci
                     </p>
+                    <button class="ai-record-button" id="aiRecordButton">🎤</button>
+                    <div class="recording-timer" id="aiRecordingTimer">00:00</div>
+                </div>
+
+                <div class="voice-analysis" id="voiceAnalysis" style="display: none;">
+                    <h4 style="margin-bottom: 15px;">📊 Analisi Composizione Vocale</h4>
+                    
+                    <div class="voice-percentage" id="ariaPercentage">
+                        <div class="voice-name">
+                            <span>🌬️</span>
+                            <span>Aria</span>
+                        </div>
+                        <div class="percentage-bar">
+                            <div class="percentage-fill aria" id="ariaFill" style="width: 0%"></div>
+                        </div>
+                        <div class="percentage-value" id="ariaValue">0%</div>
+                    </div>
+
+                    <div class="voice-percentage" id="acquaPercentage">
+                        <div class="voice-name">
+                            <span>💧</span>
+                            <span>Acqua</span>
+                        </div>
+                        <div class="percentage-bar">
+                            <div class="percentage-fill acqua" id="acquaFill" style="width: 0%"></div>
+                        </div>
+                        <div class="percentage-value" id="acquaValue">0%</div>
+                    </div>
+
+                    <div class="voice-percentage" id="terraPercentage">
+                        <div class="voice-name">
+                            <span>🌍</span>
+                            <span>Terra</span>
+                        </div>
+                        <div class="percentage-bar">
+                            <div class="percentage-fill terra" id="terraFill" style="width: 0%"></div>
+                        </div>
+                        <div class="percentage-value" id="terraValue">0%</div>
+                    </div>
+
+                    <div class="voice-percentage" id="fuocoPercentage">
+                        <div class="voice-name">
+                            <span>🔥</span>
+                            <span>Fuoco</span>
+                        </div>
+                        <div class="percentage-bar">
+                            <div class="percentage-fill fuoco" id="fuocoFill" style="width: 0%"></div>
+                        </div>
+                        <div class="percentage-value" id="fuocoValue">0%</div>
+                    </div>
                 </div>
             </div>
 
@@ -513,6 +709,43 @@
                 </div>
             </div>
 
+            <!-- Recorded Voice Waveform -->
+            <div class="panel half-width">
+                <h2 class="panel-title">📈 Forma d'Onda Registrata</h2>
+                
+                <div class="recorded-waveform">
+                    <h4>Tua Registrazione</h4>
+                    <canvas class="recorded-canvas" id="recordedCanvas"></canvas>
+                    <div class="waveform-controls">
+                        <button class="waveform-btn ai-btn" onclick="playRecorded()">▶️ Play</button>
+                        <button class="waveform-btn ai-btn" onclick="analyzeRecorded()">🔍 Analizza</button>
+                        <button class="waveform-btn ai-btn" onclick="saveRecording()">💾 Salva</button>
+                    </div>
+                    <p style="font-size: 0.9em; color: #666; margin-top: 10px;" id="recordedDescription">
+                        Nessuna registrazione disponibile
+                    </p>
+                </div>
+            </div>
+
+            <!-- Reference Waveforms -->
+            <div class="panel half-width">
+                <h2 class="panel-title">📊 Pattern di Riferimento</h2>
+                
+                <div class="waveform-container">
+                    <h4>Forme d'Onda Ideali</h4>
+                    <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
+                    <div class="waveform-controls">
+                        <button class="waveform-btn" onclick="showWaveform('aria')">🌬️ Aria</button>
+                        <button class="waveform-btn" onclick="showWaveform('acqua')">💧 Acqua</button>
+                        <button class="waveform-btn" onclick="showWaveform('terra')">🌍 Terra</button>
+                        <button class="waveform-btn" onclick="showWaveform('fuoco')">🔥 Fuoco</button>
+                    </div>
+                    <p style="font-size: 0.9em; color: #666; margin-top: 10px;" id="waveformDescription">
+                        Clicca sui pulsanti per vedere i pattern caratteristici di ogni voce
+                    </p>
+                </div>
+            </div>
+
             <!-- Validation Queue -->
             <div class="panel full-width">
                 <h2 class="panel-title">✅ Coda di Validazione</h2>
@@ -534,7 +767,11 @@
             constructor() {
                 this.selectedVoice = null;
                 this.isRecording = false;
+                this.isAiRecording = false;
                 this.validationQueue = [];
+                this.lastRecording = null;
+                this.recordingData = [];
+                
                 this.stats = {
                     overallAccuracy: 94,
                     validatedSamples: 847,
@@ -589,9 +826,13 @@
                     });
                 });
 
-                // Recording
+                // Recording buttons
                 document.getElementById('recordButton').addEventListener('click', () => {
                     this.toggleRecording();
+                });
+
+                document.getElementById('aiRecordButton').addEventListener('click', () => {
+                    this.toggleAiRecording();
                 });
             }
 
@@ -622,22 +863,21 @@
                 }
             }
 
+            toggleAiRecording() {
+                if (this.isAiRecording) {
+                    this.stopAiRecording();
+                } else {
+                    this.startAiRecording();
+                }
+            }
+
             startRecording() {
                 this.isRecording = true;
                 const recordButton = document.getElementById('recordButton');
                 recordButton.classList.add('recording');
                 recordButton.textContent = '⏹️';
                 
-                // Start timer
-                let seconds = 0;
-                this.recordingTimer = setInterval(() => {
-                    seconds++;
-                    const minutes = Math.floor(seconds / 60);
-                    const secs = seconds % 60;
-                    document.getElementById('recordingTimer').textContent = 
-                        `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                }, 1000);
-
+                this.startTimer('recordingTimer');
                 console.log('Recording started for voice:', this.selectedVoice);
             }
 
@@ -647,8 +887,7 @@
                 recordButton.classList.remove('recording');
                 recordButton.textContent = '🎤';
                 
-                clearInterval(this.recordingTimer);
-                document.getElementById('recordingTimer').textContent = '00:00';
+                this.stopTimer('recordingTimer');
                 
                 // Simulate analysis
                 setTimeout(() => {
@@ -658,8 +897,190 @@
                 console.log('Recording stopped');
             }
 
+            startAiRecording() {
+                this.isAiRecording = true;
+                const aiRecordButton = document.getElementById('aiRecordButton');
+                aiRecordButton.classList.add('recording');
+                aiRecordButton.textContent = '⏹️';
+                
+                this.startTimer('aiRecordingTimer');
+                this.recordingData = []; // Reset recording data
+                
+                // Simulate real-time recording data collection
+                this.recordingInterval = setInterval(() => {
+                    this.recordingData.push({
+                        timestamp: Date.now(),
+                        amplitude: (Math.random() - 0.5) * 2,
+                        frequency: Math.random() * 1000 + 100
+                    });
+                }, 50);
+                
+                console.log('AI Recording started');
+            }
+
+            stopAiRecording() {
+                this.isAiRecording = false;
+                const aiRecordButton = document.getElementById('aiRecordButton');
+                aiRecordButton.classList.remove('recording');
+                aiRecordButton.textContent = '🎤';
+                
+                this.stopTimer('aiRecordingTimer');
+                clearInterval(this.recordingInterval);
+                
+                this.showNotification('Analizzando la registrazione...', 'info');
+                
+                // Simulate AI analysis
+                setTimeout(() => {
+                    this.performAiAnalysis();
+                    this.drawRecordedWaveform();
+                }, 2000);
+
+                console.log('AI Recording stopped, data points:', this.recordingData.length);
+            }
+
+            startTimer(timerId) {
+                let seconds = 0;
+                this[timerId + 'Interval'] = setInterval(() => {
+                    seconds++;
+                    const minutes = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    document.getElementById(timerId).textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }, 1000);
+            }
+
+            stopTimer(timerId) {
+                clearInterval(this[timerId + 'Interval']);
+                document.getElementById(timerId).textContent = '00:00';
+            }
+
+            performAiAnalysis() {
+                // Simulate AI analysis with realistic percentages
+                const voices = ['aria', 'acqua', 'terra', 'fuoco'];
+                let percentages = {};
+                
+                // Generate realistic percentages that sum to 100
+                let remaining = 100;
+                voices.forEach((voice, index) => {
+                    if (index === voices.length - 1) {
+                        percentages[voice] = remaining;
+                    } else {
+                        const max = Math.min(remaining, 60);
+                        const min = Math.max(5, remaining - (voices.length - index - 1) * 40);
+                        percentages[voice] = Math.floor(Math.random() * (max - min + 1)) + min;
+                        remaining -= percentages[voice];
+                    }
+                });
+
+                // Shuffle to make it more realistic
+                const shuffled = Object.entries(percentages).sort(() => Math.random() - 0.5);
+                percentages = Object.fromEntries(shuffled);
+
+                this.displayVoiceAnalysis(percentages);
+            }
+
+            displayVoiceAnalysis(percentages) {
+                document.getElementById('voiceAnalysis').style.display = 'block';
+                
+                // Find highest percentage for highlighting
+                const highest = Object.entries(percentages).reduce((a, b) => 
+                    percentages[a[0]] > percentages[b[0]] ? a : b
+                )[0];
+
+                Object.entries(percentages).forEach(([voice, percentage]) => {
+                    const fillElement = document.getElementById(`${voice}Fill`);
+                    const valueElement = document.getElementById(`${voice}Value`);
+                    const containerElement = document.getElementById(`${voice}Percentage`);
+                    
+                    // Animate the fill
+                    setTimeout(() => {
+                        fillElement.style.width = percentage + '%';
+                        fillElement.textContent = percentage + '%';
+                        valueElement.textContent = percentage + '%';
+                        
+                        // Highlight the highest percentage
+                        if (voice === highest) {
+                            containerElement.classList.add('highest');
+                        } else {
+                            containerElement.classList.remove('highest');
+                        }
+                    }, 300);
+                });
+
+                const highestVoice = highest.charAt(0).toUpperCase() + highest.slice(1);
+                this.showNotification(`Voce dominante: ${highestVoice} (${percentages[highest]}%)`, 'success');
+            }
+
+            drawRecordedWaveform() {
+                const canvas = document.getElementById('recordedCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                
+                const width = canvas.width;
+                const height = canvas.height;
+                const centerY = height / 2;
+                const margin = 20;
+                
+                // Clear canvas
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw grid
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 8; i++) {
+                    const y = (height / 8) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+                
+                // Draw center line
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw recorded waveform
+                if (this.recordingData.length > 0) {
+                    ctx.strokeStyle = '#3498db';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    const step = (width - margin * 2) / this.recordingData.length;
+                    
+                    this.recordingData.forEach((point, index) => {
+                        const x = margin + index * step;
+                        const y = centerY + point.amplitude * (height / 4);
+                        
+                        if (index === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    });
+                    
+                    ctx.stroke();
+                    
+                    // Update description
+                    const duration = (this.recordingData.length * 50) / 1000; // Convert to seconds
+                    document.getElementById('recordedDescription').textContent = 
+                        `Registrazione: ${duration.toFixed(1)}s, ${this.recordingData.length} campioni`;
+                } else {
+                    document.getElementById('recordedDescription').textContent = 
+                        'Nessuna registrazione disponibile';
+                }
+            }
+
             analyzeRecording() {
-                // Simulate AI prediction
+                // Simulate AI prediction for targeted recording
                 const confidence = 0.7 + Math.random() * 0.25;
                 const isCorrect = Math.random() > 0.3;
                 const predictedVoice = isCorrect ? this.selectedVoice : this.getRandomVoice();
@@ -692,8 +1113,7 @@
                     { actualVoice: 'acqua', predictedVoice: 'acqua', confidence: 0.92 },
                     { actualVoice: 'terra', predictedVoice: 'fuoco', confidence: 0.65 },
                     { actualVoice: 'fuoco', predictedVoice: 'fuoco', confidence: 0.89 },
-                    { actualVoice: 'aria', predictedVoice: 'aria', confidence: 0.95 },
-                    { actualVoice: 'acqua', predictedVoice: 'terra', confidence: 0.71 }
+                    { actualVoice: 'aria', predictedVoice: 'aria', confidence: 0.95 }
                 ];
 
                 this.validationQueue = sampleItems.map((item, index) => ({
@@ -721,7 +1141,7 @@
                     return;
                 }
 
-                this.validationQueue.forEach(item => {
+                this.validationQueue.slice(0, 5).forEach(item => {
                     const validationItem = this.createValidationItem(item);
                     container.appendChild(validationItem);
                 });
@@ -786,12 +1206,10 @@
                 if (!item) return;
 
                 if (isCorrect) {
-                    // Remove from queue
                     this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
                     this.stats.correctPredictions++;
                     this.showNotification('Predizione confermata come corretta', 'success');
                 } else {
-                    // Show correction options
                     const correctionDiv = document.getElementById(`correction-${itemId}`);
                     correctionDiv.classList.add('show');
                 }
@@ -808,14 +1226,11 @@
                 item.actualVoice = correctVoice;
                 item.validated = true;
 
-                // Remove from queue
                 this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
                 
-                // Update stats
                 this.stats.needsCorrection--;
                 this.stats.validatedSamples++;
                 
-                // Recalculate accuracy
                 this.recalculateAccuracy();
                 this.updateStats();
                 this.refreshValidationQueue();
@@ -824,9 +1239,8 @@
             }
 
             recalculateAccuracy() {
-                // Simulate accuracy recalculation
                 Object.keys(this.stats.voiceAccuracy).forEach(voice => {
-                    const variation = (Math.random() - 0.5) * 4; // ±2%
+                    const variation = (Math.random() - 0.5) * 4;
                     this.stats.voiceAccuracy[voice] = Math.max(85, Math.min(99, 
                         this.stats.voiceAccuracy[voice] + variation
                     ));
@@ -843,7 +1257,6 @@
                 document.getElementById('correctPredictions').textContent = this.stats.correctPredictions;
                 document.getElementById('needsCorrection').textContent = this.stats.needsCorrection;
 
-                // Update voice accuracy bars
                 Object.keys(this.stats.voiceAccuracy).forEach(voice => {
                     const accuracy = Math.round(this.stats.voiceAccuracy[voice]);
                     document.getElementById(`${voice}Accuracy`).textContent = accuracy + '%';
@@ -863,8 +1276,8 @@
                 const width = canvas.width;
                 const height = canvas.height;
                 const centerY = height / 2;
-                const margin = 40; // Margini per evitare che l'onda esca
-                const maxAmplitude = (height / 2) - margin; // Ampiezza massima sicura
+                const margin = 40;
+                const maxAmplitude = (height / 2) - margin;
                 
                 // Clear canvas
                 ctx.fillStyle = '#ffffff';
@@ -889,9 +1302,9 @@
                 ctx.moveTo(0, centerY);
                 ctx.lineTo(width, centerY);
                 ctx.stroke();
-                ctx.setLineDash([]); // Reset line dash
+                ctx.setLineDash([]);
                 
-                // Draw waveform based on voice type
+                // Draw waveform
                 ctx.strokeStyle = '#f39c12';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
@@ -904,51 +1317,40 @@
                 for (let i = 0; i < points; i++) {
                     const x = leftMargin + (drawWidth / points) * i;
                     const progress = i / points;
-                    let amplitude = 0; // Normalized amplitude (-1 to 1)
+                    let amplitude = 0;
                     
                     switch(voiceType) {
                         case 'aria':
-                            // Ascending pattern with multiple rises
                             amplitude = Math.sin(progress * Math.PI * 4) * 0.6 - (progress * 0.8);
                             if (progress > 0.7) {
-                                amplitude += Math.sin(progress * Math.PI * 12) * 0.3; // Final rises
+                                amplitude += Math.sin(progress * Math.PI * 12) * 0.3;
                             }
-                            // Clamp to safe range
                             amplitude = Math.max(-0.9, Math.min(0.3, amplitude));
                             break;
                             
                         case 'acqua':
-                            // Descending with trails (puntini)
                             amplitude = -Math.sin(progress * Math.PI * 2) * 0.4 + (progress * 0.7);
                             if (progress > 0.8) {
-                                // Add trails at the end
                                 amplitude += Math.sin(progress * Math.PI * 20) * 0.2;
                             }
-                            // Clamp to safe range
                             amplitude = Math.max(-0.3, Math.min(0.9, amplitude));
                             break;
                             
                         case 'terra':
-                            // Clean descending, sharp endings
                             amplitude = Math.sin(progress * Math.PI * 3) * 0.5 + (progress * 0.6);
                             if (progress > 0.9) {
-                                // Sharp cut-off
                                 amplitude = 0.8;
                             }
-                            // Clamp to safe range
                             amplitude = Math.max(-0.2, Math.min(0.8, amplitude));
                             break;
                             
                         case 'fuoco':
-                            // High energy, fast rhythm
                             amplitude = Math.sin(progress * Math.PI * 8) * 0.7;
-                            amplitude += Math.sin(progress * Math.PI * 16) * 0.3; // High frequency
-                            // Clamp to safe range
+                            amplitude += Math.sin(progress * Math.PI * 16) * 0.3;
                             amplitude = Math.max(-0.8, Math.min(0.8, amplitude));
                             break;
                     }
                     
-                    // Convert amplitude to canvas coordinates
                     const y = centerY + (amplitude * maxAmplitude);
                     
                     if (i === 0) {
@@ -960,10 +1362,8 @@
                 
                 ctx.stroke();
                 
-                // Add voice-specific markers with better positioning
                 this.addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude);
                 
-                // Update description
                 const description = this.voicePatterns[voiceType].description;
                 document.getElementById('waveformDescription').textContent = description;
             }
@@ -978,32 +1378,27 @@
                 
                 switch(voiceType) {
                     case 'aria':
-                        // Mark the ascending sections
                         ctx.fillText('↗️ Salite', width * 0.25, safeTopY);
                         ctx.fillText('↗️ Aperture', width * 0.5, safeTopY - 10);
                         ctx.fillText('↗️ Crescendo', width * 0.8, safeTopY);
                         break;
                         
                     case 'acqua':
-                        // Mark descending and trails
                         ctx.fillText('↘️ Discesa fluida', width * 0.35, safeTopY);
                         ctx.fillText('~~~~ Puntini finali', width * 0.8, safeBottomY);
                         break;
                         
                     case 'terra':
-                        // Mark structured descent and clean ending
                         ctx.fillText('↘️ Discesa strutturata', width * 0.4, safeTopY);
                         ctx.fillText('✂️ Taglio netto', width * 0.85, safeBottomY);
                         break;
                         
                     case 'fuoco':
-                        // Mark energy and rhythm
                         ctx.fillText('⚡ Alta energia', width * 0.25, safeTopY);
                         ctx.fillText('🔥 Ritmo incalzante', width * 0.75, safeTopY);
                         break;
                 }
                 
-                // Reset text alignment
                 ctx.textAlign = 'start';
             }
 
@@ -1039,6 +1434,29 @@
         function generateNewSamples() {
             app.generateValidationQueue();
             app.showNotification('Nuovi campioni generati per la validazione', 'info');
+        }
+
+        function playRecorded() {
+            app.showNotification('Riproduzione simulata della registrazione', 'info');
+        }
+
+        function analyzeRecorded() {
+            if (app.recordingData.length > 0) {
+                app.showNotification('Rianalizzando la registrazione...', 'info');
+                setTimeout(() => {
+                    app.performAiAnalysis();
+                }, 1500);
+            } else {
+                app.showNotification('Nessuna registrazione da analizzare', 'warning');
+            }
+        }
+
+        function saveRecording() {
+            if (app.recordingData.length > 0) {
+                app.showNotification('Registrazione salvata nel database di training', 'success');
+            } else {
+                app.showNotification('Nessuna registrazione da salvare', 'warning');
+            }
         }
 
         // Initialize the application
