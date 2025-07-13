@@ -1,0 +1,15 @@
+﻿{
+  "name": "voice-break-app",
+  "version": "1.0.0",
+  "description": "🎤 Sistema di analisi vocale AI per le 4 voci della comunicazione efficace",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vite": "^5.0.0",
+    "@tensorflow/tfjs": "^4.15.0"
+  }
+}
