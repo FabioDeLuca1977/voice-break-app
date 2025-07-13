@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Break AI - Pannello Trainer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.1);
+            padding: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            font-weight: 700;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Recording Section */
+        .recording-area {
+            text-align: center;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .voice-selector {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .voice-option {
+            background: #f8f9fa;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .voice-option.selected {
+            border-color: #f39c12;
+            background: #fef9e7;
+        }
+
+        .voice-option:hover {
+            background: #e9ecef;
+        }
+
+        .voice-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .record-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            font-size: 2.5em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+        }
+
+        .record-button:hover {
+            transform: scale(1.05);
+        }
+
+        .record-button.recording {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .recording-timer {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #333;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Validation Section */
+        .validation-item {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #f39c12;
+        }
+
+        .prediction-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .prediction-info {
+            flex: 1;
+        }
+
+        .predicted-voice {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .confidence {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .correction-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .correction-btn {
+            background: none;
+            border: 2px solid #dee2e6;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .correction-btn.correct {
+            border-color: #27ae60;
+            color: #27ae60;
+        }
+
+        .correction-btn.correct:hover {
+            background: #27ae60;
+            color: white;
+        }
+
+        .correction-btn.wrong {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .correction-btn.wrong:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .voice-correction {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .voice-correction.show {
+            display: grid;
+        }
+
+        .voice-correct-btn {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+        }
+
+        .voice-correct-btn:hover {
+            background: #e9ecef;
+        }
+
+        .voice-correct-btn.selected {
+            border-color: #f39c12;
+            background: #fef9e7;
+        }
+
+        /* Waveform Visualization */
+        .waveform-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .waveform-canvas {
+            width: 100%;
+            height: 150px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .waveform-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .waveform-btn {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .waveform-btn:hover {
+            background: #e67e22;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #f39c12;
+            display: block;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        /* Progress indicators */
+        .accuracy-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .accuracy-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .voice-selector {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .correction-buttons {
+                flex-direction: column;
+            }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left: 4px solid #27ae60;
+        }
+
+        .notification.error {
+            border-left: 4px solid #e74c3c;
+        }
+
+        .notification.warning {
+            border-left: 4px solid #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎓 Pannello Trainer - Validazione e Correzione</h1>
+        <a href="index.html" class="back-btn">← Home</a>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-grid">
+            <!-- Recording & Testing -->
+            <div class="panel">
+                <h2 class="panel-title">🎤 Test Recording</h2>
+                
+                <div class="voice-selector">
+                    <div class="voice-option" data-voice="aria">
+                        <span class="voice-icon">🌬️</span>
+                        <div>Aria</div>
+                    </div>
+                    <div class="voice-option" data-voice="acqua">
+                        <span class="voice-icon">💧</span>
+                        <div>Acqua</div>
+                    </div>
+                    <div class="voice-option" data-voice="terra">
+                        <span class="voice-icon">🌍</span>
+                        <div>Terra</div>
+                    </div>
+                    <div class="voice-option" data-voice="fuoco">
+                        <span class="voice-icon">🔥</span>
+                        <div>Fuoco</div>
+                    </div>
+                </div>
+
+                <div class="recording-area">
+                    <p id="recordingTip">Seleziona una voce da testare</p>
+                    <button class="record-button" id="recordButton">🎤</button>
+                    <div class="recording-timer" id="recordingTimer">00:00</div>
+                </div>
+
+                <!-- Waveform Visualization -->
+                <div class="waveform-container">
+                    <h4>📈 Analisi Forme d'Onda</h4>
+                    <canvas class="waveform-canvas" id="waveformCanvas"></canvas>
+                    <div class="waveform-controls">
+                        <button class="waveform-btn" onclick="showWaveform('aria')">🌬️ Aria Pattern</button>
+                        <button class="waveform-btn" onclick="showWaveform('acqua')">💧 Acqua Pattern</button>
+                        <button class="waveform-btn" onclick="showWaveform('terra')">🌍 Terra Pattern</button>
+                        <button class="waveform-btn" onclick="showWaveform('fuoco')">🔥 Fuoco Pattern</button>
+                    </div>
+                    <p style="font-size: 0.9em; color: #666; margin-top: 10px;" id="waveformDescription">
+                        Clicca sui pulsanti per vedere i pattern caratteristici di ogni voce
+                    </p>
+                </div>
+            </div>
+
+            <!-- Model Statistics -->
+            <div class="panel">
+                <h2 class="panel-title">📊 Performance Modello</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-number" id="overallAccuracy">94%</span>
+                        <div class="stat-label">Accuratezza Generale</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="validatedSamples">847</span>
+                        <div class="stat-label">Campioni Validati</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="correctPredictions">798</span>
+                        <div class="stat-label">Predizioni Corrette</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="needsCorrection">49</span>
+                        <div class="stat-label">Da Correggere</div>
+                    </div>
+                </div>
+
+                <h4 style="margin: 25px 0 15px 0;">Accuratezza per Voce:</h4>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>🌬️ Aria</span>
+                        <span id="ariaAccuracy">96%</span>
+                    </div>
+                    <div class="accuracy-bar">
+                        <div class="accuracy-fill" style="width: 96%"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>💧 Acqua</span>
+                        <span id="acquaAccuracy">93%</span>
+                    </div>
+                    <div class="accuracy-bar">
+                        <div class="accuracy-fill" style="width: 93%"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>🌍 Terra</span>
+                        <span id="terraAccuracy">91%</span>
+                    </div>
+                    <div class="accuracy-bar">
+                        <div class="accuracy-fill" style="width: 91%"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>🔥 Fuoco</span>
+                        <span id="fuocoAccuracy">97%</span>
+                    </div>
+                    <div class="accuracy-bar">
+                        <div class="accuracy-fill" style="width: 97%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Validation Queue -->
+            <div class="panel full-width">
+                <h2 class="panel-title">✅ Coda di Validazione</h2>
+                
+                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 20px;">
+                    <p style="color: #666;">Correggi le predizioni del modello per migliorare l'accuratezza</p>
+                    <button class="waveform-btn" onclick="generateNewSamples()">🔄 Genera Nuovi Campioni</button>
+                </div>
+
+                <div id="validationQueue">
+                    <!-- Validation items will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VoiceBreakTrainer {
+            constructor() {
+                this.selectedVoice = null;
+                this.isRecording = false;
+                this.validationQueue = [];
+                this.stats = {
+                    overallAccuracy: 94,
+                    validatedSamples: 847,
+                    correctPredictions: 798,
+                    needsCorrection: 49,
+                    voiceAccuracy: {
+                        aria: 96,
+                        acqua: 93,
+                        terra: 91,
+                        fuoco: 97
+                    }
+                };
+
+                this.voicePatterns = {
+                    aria: {
+                        description: "Salite graduali e aperture, come una brezza che sale",
+                        pattern: "ascending",
+                        characteristics: ["Tono ascendente", "Aperture graduate", "Energia crescente"]
+                    },
+                    acqua: {
+                        description: "Discese fluide con puntini finali (fondoooo)",
+                        pattern: "descending_with_trails",
+                        characteristics: ["Tono discendente", "Pause fluide", "Finali prolungate"]
+                    },
+                    terra: {
+                        description: "Discese nette senza puntini, chiusure secche (fondo)",
+                        pattern: "descending_clean",
+                        characteristics: ["Tono fermo", "Chiusure nette", "Finali secche"]
+                    },
+                    fuoco: {
+                        description: "Energia alta, ritmo incalzante, spinta all'azione",
+                        pattern: "energetic",
+                        characteristics: ["Energia alta", "Ritmo veloce", "Tono incisivo"]
+                    }
+                };
+                
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.generateValidationQueue();
+                this.updateStats();
+                console.log('Voice Break Trainer initialized');
+            }
+
+            setupEventListeners() {
+                // Voice selection
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        this.selectVoice(option.dataset.voice);
+                    });
+                });
+
+                // Recording
+                document.getElementById('recordButton').addEventListener('click', () => {
+                    this.toggleRecording();
+                });
+            }
+
+            selectVoice(voiceType) {
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                document.querySelector(`[data-voice="${voiceType}"]`).classList.add('selected');
+                this.selectedVoice = voiceType;
+                
+                const tip = `Test registrazione per la voce ${this.voicePatterns[voiceType].description}`;
+                document.getElementById('recordingTip').textContent = tip;
+                
+                console.log(`Selected voice: ${voiceType}`);
+            }
+
+            toggleRecording() {
+                if (!this.selectedVoice) {
+                    this.showNotification('Seleziona prima una voce da testare', 'warning');
+                    return;
+                }
+
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            }
+
+            startRecording() {
+                this.isRecording = true;
+                const recordButton = document.getElementById('recordButton');
+                recordButton.classList.add('recording');
+                recordButton.textContent = '⏹️';
+                
+                // Start timer
+                let seconds = 0;
+                this.recordingTimer = setInterval(() => {
+                    seconds++;
+                    const minutes = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    document.getElementById('recordingTimer').textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }, 1000);
+
+                console.log('Recording started for voice:', this.selectedVoice);
+            }
+
+            stopRecording() {
+                this.isRecording = false;
+                const recordButton = document.getElementById('recordButton');
+                recordButton.classList.remove('recording');
+                recordButton.textContent = '🎤';
+                
+                clearInterval(this.recordingTimer);
+                document.getElementById('recordingTimer').textContent = '00:00';
+                
+                // Simulate analysis
+                setTimeout(() => {
+                    this.analyzeRecording();
+                }, 1000);
+
+                console.log('Recording stopped');
+            }
+
+            analyzeRecording() {
+                // Simulate AI prediction
+                const confidence = 0.7 + Math.random() * 0.25;
+                const isCorrect = Math.random() > 0.3;
+                const predictedVoice = isCorrect ? this.selectedVoice : this.getRandomVoice();
+                
+                const validationItem = {
+                    id: Date.now(),
+                    actualVoice: this.selectedVoice,
+                    predictedVoice: predictedVoice,
+                    confidence: confidence,
+                    timestamp: new Date(),
+                    validated: false
+                };
+                
+                this.validationQueue.unshift(validationItem);
+                this.refreshValidationQueue();
+                
+                this.showNotification(`Analisi completata: ${predictedVoice.toUpperCase()} (${Math.round(confidence * 100)}%)`, 'success');
+            }
+
+            getRandomVoice() {
+                const voices = ['aria', 'acqua', 'terra', 'fuoco'];
+                const filtered = voices.filter(v => v !== this.selectedVoice);
+                return filtered[Math.floor(Math.random() * filtered.length)];
+            }
+
+            generateValidationQueue() {
+                // Generate some sample validation items
+                const sampleItems = [
+                    { actualVoice: 'aria', predictedVoice: 'terra', confidence: 0.78 },
+                    { actualVoice: 'acqua', predictedVoice: 'acqua', confidence: 0.92 },
+                    { actualVoice: 'terra', predictedVoice: 'fuoco', confidence: 0.65 },
+                    { actualVoice: 'fuoco', predictedVoice: 'fuoco', confidence: 0.89 },
+                    { actualVoice: 'aria', predictedVoice: 'aria', confidence: 0.95 },
+                    { actualVoice: 'acqua', predictedVoice: 'terra', confidence: 0.71 }
+                ];
+
+                this.validationQueue = sampleItems.map((item, index) => ({
+                    id: Date.now() + index,
+                    ...item,
+                    timestamp: new Date(Date.now() - Math.random() * 3600000),
+                    validated: false
+                }));
+
+                this.refreshValidationQueue();
+            }
+
+            refreshValidationQueue() {
+                const container = document.getElementById('validationQueue');
+                container.innerHTML = '';
+
+                if (this.validationQueue.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <div style="font-size: 3em; margin-bottom: 15px;">✅</div>
+                            <p>Tutte le predizioni sono state validate!</p>
+                            <p style="font-size: 0.9em; margin-top: 5px;">Registra nuovi test per continuare il training</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                this.validationQueue.forEach(item => {
+                    const validationItem = this.createValidationItem(item);
+                    container.appendChild(validationItem);
+                });
+            }
+
+            createValidationItem(item) {
+                const div = document.createElement('div');
+                div.className = 'validation-item';
+                div.dataset.id = item.id;
+
+                const voiceIcons = {
+                    aria: '🌬️',
+                    acqua: '💧',
+                    terra: '🌍',
+                    fuoco: '🔥'
+                };
+
+                const isCorrect = item.actualVoice === item.predictedVoice;
+                const confidencePercent = Math.round(item.confidence * 100);
+
+                div.innerHTML = `
+                    <div class="prediction-row">
+                        <div class="prediction-info">
+                            <div class="predicted-voice">
+                                ${voiceIcons[item.predictedVoice]} Predizione: <strong>${item.predictedVoice.toUpperCase()}</strong>
+                                ${isCorrect ? '✅' : '❌'}
+                            </div>
+                            <div class="confidence">
+                                Affidabilità: ${confidencePercent}% • Registrato: ${item.timestamp.toLocaleTimeString('it-IT')}
+                            </div>
+                        </div>
+                        <div class="correction-buttons">
+                            <button class="correction-btn correct" onclick="validatePrediction('${item.id}', true)">
+                                ✅ Corretto
+                            </button>
+                            <button class="correction-btn wrong" onclick="validatePrediction('${item.id}', false)">
+                                ❌ Sbagliato
+                            </button>
+                        </div>
+                    </div>
+                    <div class="voice-correction" id="correction-${item.id}">
+                        <div class="voice-correct-btn" data-voice="aria" onclick="correctVoice('${item.id}', 'aria')">
+                            ${voiceIcons.aria} Aria
+                        </div>
+                        <div class="voice-correct-btn" data-voice="acqua" onclick="correctVoice('${item.id}', 'acqua')">
+                            ${voiceIcons.acqua} Acqua
+                        </div>
+                        <div class="voice-correct-btn" data-voice="terra" onclick="correctVoice('${item.id}', 'terra')">
+                            ${voiceIcons.terra} Terra
+                        </div>
+                        <div class="voice-correct-btn" data-voice="fuoco" onclick="correctVoice('${item.id}', 'fuoco')">
+                            ${voiceIcons.fuoco} Fuoco
+                        </div>
+                    </div>
+                `;
+
+                return div;
+            }
+
+            validatePrediction(itemId, isCorrect) {
+                const item = this.validationQueue.find(i => i.id == itemId);
+                if (!item) return;
+
+                if (isCorrect) {
+                    // Remove from queue
+                    this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
+                    this.stats.correctPredictions++;
+                    this.showNotification('Predizione confermata come corretta', 'success');
+                } else {
+                    // Show correction options
+                    const correctionDiv = document.getElementById(`correction-${itemId}`);
+                    correctionDiv.classList.add('show');
+                }
+
+                this.stats.validatedSamples++;
+                this.updateStats();
+                this.refreshValidationQueue();
+            }
+
+            correctVoice(itemId, correctVoice) {
+                const item = this.validationQueue.find(i => i.id == itemId);
+                if (!item) return;
+
+                item.actualVoice = correctVoice;
+                item.validated = true;
+
+                // Remove from queue
+                this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
+                
+                // Update stats
+                this.stats.needsCorrection--;
+                this.stats.validatedSamples++;
+                
+                // Recalculate accuracy
+                this.recalculateAccuracy();
+                this.updateStats();
+                this.refreshValidationQueue();
+
+                this.showNotification(`Correzione salvata: ${correctVoice.toUpperCase()}`, 'success');
+            }
+
+            recalculateAccuracy() {
+                // Simulate accuracy recalculation
+                Object.keys(this.stats.voiceAccuracy).forEach(voice => {
+                    const variation = (Math.random() - 0.5) * 4; // ±2%
+                    this.stats.voiceAccuracy[voice] = Math.max(85, Math.min(99, 
+                        this.stats.voiceAccuracy[voice] + variation
+                    ));
+                });
+
+                const avgAccuracy = Object.values(this.stats.voiceAccuracy)
+                    .reduce((a, b) => a + b, 0) / 4;
+                this.stats.overallAccuracy = Math.round(avgAccuracy);
+            }
+
+            updateStats() {
+                document.getElementById('overallAccuracy').textContent = this.stats.overallAccuracy + '%';
+                document.getElementById('validatedSamples').textContent = this.stats.validatedSamples;
+                document.getElementById('correctPredictions').textContent = this.stats.correctPredictions;
+                document.getElementById('needsCorrection').textContent = this.stats.needsCorrection;
+
+                // Update voice accuracy bars
+                Object.keys(this.stats.voiceAccuracy).forEach(voice => {
+                    const accuracy = Math.round(this.stats.voiceAccuracy[voice]);
+                    document.getElementById(`${voice}Accuracy`).textContent = accuracy + '%';
+                    
+                    const bar = document.querySelector(`#${voice}Accuracy`).parentElement.nextElementSibling.querySelector('.accuracy-fill');
+                    bar.style.width = accuracy + '%';
+                });
+            }
+
+            showWaveform(voiceType) {
+                const canvas = document.getElementById('waveformCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                
+                const width = canvas.width;
+                const height = canvas.height;
+                const centerY = height / 2;
+                
+                // Clear canvas
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw grid
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 10; i++) {
+                    const y = (height / 10) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+                
+                // Draw waveform based on voice type
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                const points = 200;
+                for (let i = 0; i < points; i++) {
+                    const x = (width / points) * i;
+                    const progress = i / points;
+                    let y = centerY;
+                    
+                    switch(voiceType) {
+                        case 'aria':
+                            // Ascending pattern with multiple rises
+                            y = centerY + Math.sin(progress * Math.PI * 4) * 30 - (progress * 40);
+                            if (progress > 0.7) {
+                                y += Math.sin(progress * Math.PI * 12) * 15; // Final rises
+                            }
+                            break;
+                            
+                        case 'acqua':
+                            // Descending with trails (puntini)
+                            y = centerY - Math.sin(progress * Math.PI * 2) * 20 + (progress * 35);
+                            if (progress > 0.8) {
+                                // Add trails at the end
+                                y += Math.sin(progress * Math.PI * 20) * 10;
+                            }
+                            break;
+                            
+                        case 'terra':
+                            // Clean descending, sharp endings
+                            y = centerY + Math.sin(progress * Math.PI * 3) * 25 + (progress * 30);
+                            if (progress > 0.9) {
+                                // Sharp cut-off
+                                y = centerY + 40;
+                            }
+                            break;
+                            
+                        case 'fuoco':
+                            // High energy, fast rhythm
+                            y = centerY + Math.sin(progress * Math.PI * 8) * 35;
+                            y += Math.sin(progress * Math.PI * 16) * 15; // High frequency
+                            break;
+                    }
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                
+                // Add voice-specific markers
+                this.addVoiceMarkers(ctx, voiceType, width, height, centerY);
+                
+                // Update description
+                const description = this.voicePatterns[voiceType].description;
+                document.getElementById('waveformDescription').textContent = description;
+            }
+
+            addVoiceMarkers(ctx, voiceType, width, height, centerY) {
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#e67e22';
+                
+                switch(voiceType) {
+                    case 'aria':
+                        // Mark the ascending sections
+                        ctx.fillText('↗️ Salite', width * 0.2, centerY - 50);
+                        ctx.fillText('↗️ Aperture', width * 0.5, centerY - 60);
+                        ctx.fillText('↗️ Crescendo', width * 0.8, centerY - 70);
+                        break;
+                        
+                    case 'acqua':
+                        // Mark descending and trails
+                        ctx.fillText('↘️ Discesa fluida', width * 0.3, centerY - 30);
+                        ctx.fillText('~~~~ Puntini finali', width * 0.8, centerY + 40);
+                        break;
+                        
+                    case 'terra':
+                        // Mark structured descent and clean ending
+                        ctx.fillText('↘️ Discesa strutturata', width * 0.4, centerY - 35);
+                        ctx.fillText('✂️ Taglio netto', width * 0.9, centerY + 50);
+                        break;
+                        
+                    case 'fuoco':
+                        // Mark energy and rhythm
+                        ctx.fillText('⚡ Alta energia', width * 0.2, centerY - 45);
+                        ctx.fillText('🔥 Ritmo incalzante', width * 0.6, centerY - 50);
+                        break;
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 4000);
+            }
+        }
+
+        // Global functions
+        function validatePrediction(itemId, isCorrect) {
+            app.validatePrediction(itemId, isCorrect);
+        }
+
+        function correctVoice(itemId, voice) {
+            app.correctVoice(itemId, voice);
+        }
+
+        function showWaveform(voiceType) {
+            app.showWaveform(voiceType);
+        }
+
+        function generateNewSamples() {
+            app.generateValidationQueue();
+            app.showNotification('Nuovi campioni generati per la validazione', 'info');
+        }
+
+        // Initialize the application
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new VoiceBreakTrainer();
+            
+            // Show default waveform
+            setTimeout(() => {
+                app.showWaveform('aria');
+            }, 500);
+        });
+    </script>
+</body>
+</html>
