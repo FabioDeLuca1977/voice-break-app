@@ -1367,9 +1367,14 @@
                     resultsPanel.id = 'targetedResults';
                     resultsPanel.className = 'targeted-results';
                     
-                    // Inserisci dopo l'area di registrazione
-                    const recordingArea = document.querySelector('.recording-area');
-                    recordingArea.insertAdjacentElement('afterend', resultsPanel);
+                    // Trova il pannello del Test Mirato e inserisci dopo
+                    const testPanel = document.querySelector('.panel');
+                    if (testPanel) {
+                        testPanel.appendChild(resultsPanel);
+                    } else {
+                        console.error('Pannello Test Mirato non trovato');
+                        return;
+                    }
                 }
                 
                 const voiceEmojis = {
@@ -1387,7 +1392,7 @@
                 };
                 
                 resultsPanel.innerHTML = `
-                    <h4 style="margin-bottom: 15px; text-align: center;">
+                    <h4 style="margin-bottom: 15px; text-align: center; margin-top: 20px;">
                         📊 Analisi ${voiceEmojis[analysis.selectedVoice]} ${voiceNames[analysis.selectedVoice]}
                     </h4>
                     
@@ -1397,8 +1402,8 @@
                             <div class="metric-bar">
                                 <div class="metric-target" style="left: ${analysis.target.intensity}%"></div>
                                 <div class="metric-fill" style="width: ${analysis.measured.intensity}%"></div>
-                                <div class="metric-value">${Math.round(analysis.measured.intensity)}%</div>
                             </div>
+                            <div class="metric-value">${Math.round(analysis.measured.intensity)}%</div>
                         </div>
                         
                         <div class="metric-row">
@@ -1406,8 +1411,8 @@
                             <div class="metric-bar">
                                 <div class="metric-target" style="left: ${((analysis.target.frequency - 200) / 400) * 100}%"></div>
                                 <div class="metric-fill frequency" style="width: ${((analysis.measured.frequency - 200) / 400) * 100}%"></div>
-                                <div class="metric-value">${Math.round(analysis.measured.frequency)} Hz</div>
                             </div>
+                            <div class="metric-value">${Math.round(analysis.measured.frequency)} Hz</div>
                         </div>
                         
                         <div class="metric-row">
@@ -1415,8 +1420,8 @@
                             <div class="metric-bar">
                                 <div class="metric-target" style="left: ${((analysis.target.decibels - 50) / 40) * 100}%"></div>
                                 <div class="metric-fill decibels" style="width: ${((analysis.measured.decibels - 50) / 40) * 100}%"></div>
-                                <div class="metric-value">${Math.round(analysis.measured.decibels)} dB</div>
                             </div>
+                            <div class="metric-value">${Math.round(analysis.measured.decibels)} dB</div>
                         </div>
                         
                         <div class="metric-row">
@@ -1435,6 +1440,7 @@
                 `;
                 
                 resultsPanel.style.display = 'block';
+                console.log('Pannello analisi creato e mostrato');
             }
 
             getPatternDescription(pattern) {
