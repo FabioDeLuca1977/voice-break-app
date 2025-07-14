@@ -777,8 +777,733 @@
     </div>
 
     <script>
-        // Tutto il JavaScript del trainer rimane identico al precedente
-        // ... [inserire qui tutto il JavaScript dal trainer precedente]
+        class VoiceBreakTrainer {
+            constructor() {
+                this.selectedVoice = null;
+                this.isRecording = false;
+                this.isAiRecording = false;
+                this.audioContext = null;
+                this.mediaRecorder = null;
+                this.stream = null;
+                this.recordingTimer = null;
+                this.aiRecordingTimer = null;
+                this.recordingTime = 0;
+                this.aiRecordingTime = 0;
+                this.audioInitialized = false;
+                this.demoMode = false;
+                this.currentRecording = null;
+                
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.loadValidationQueue();
+                this.showPermissionRequest();
+                console.log('🎯 Voice Break Trainer initialized');
+            }
+
+            setupEventListeners() {
+                // Voice selection
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        this.selectVoice(e.currentTarget.dataset.voice);
+                    });
+                });
+
+                // Recording buttons
+                document.getElementById('recordButton').addEventListener('click', () => {
+                    this.toggleRecording();
+                });
+
+                document.getElementById('aiRecordButton').addEventListener('click', () => {
+                    this.toggleAiRecording();
+                });
+            }
+
+            showPermissionRequest() {
+                const permissionOverlay = document.createElement('div');
+                permissionOverlay.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.8);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                        backdrop-filter: blur(5px);
+                    ">
+                        <div style="
+                            background: white;
+                            padding: 40px;
+                            border-radius: 20px;
+                            text-align: center;
+                            max-width: 500px;
+                            margin: 20px;
+                            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+                        ">
+                            <div style="font-size: 4em; margin-bottom: 20px;">🎤</div>
+                            <h2 style="margin-bottom: 15px; color: #333;">Permesso Microfono</h2>
+                            <p style="margin-bottom: 25px; color: #666; line-height: 1.5;">
+                                Il Trainer ha bisogno di accedere al microfono per registrare e analizzare le voci.
+                                <br><br>
+                                <strong>I dati audio vengono elaborati solo localmente.</strong>
+                            </p>
+                            <button id="requestPermissionBtn" style="
+                                background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+                                color: white;
+                                border: none;
+                                padding: 15px 30px;
+                                border-radius: 25px;
+                                font-size: 1.1em;
+                                font-weight: 600;
+                                cursor: pointer;
+                                margin-right: 10px;
+                            ">
+                                🎤 Concedi Permesso
+                            </button>
+                            <button id="skipPermissionBtn" style="
+                                background: #6c757d;
+                                color: white;
+                                border: none;
+                                padding: 15px 30px;
+                                border-radius: 25px;
+                                font-size: 1.1em;
+                                font-weight: 600;
+                                cursor: pointer;
+                            ">
+                                Modalità Demo
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(permissionOverlay);
+                
+                document.getElementById('requestPermissionBtn').addEventListener('click', async () => {
+                    try {
+                        await this.initializeAudio();
+                        permissionOverlay.remove();
+                        this.showNotification('✅ Microfono attivato!', 'success');
+                    } catch (error) {
+                        this.showPermissionError(error);
+                    }
+                });
+                
+                document.getElementById('skipPermissionBtn').addEventListener('click', () => {
+                    permissionOverlay.remove();
+                    this.enableDemoMode();
+                });
+            }
+
+            async initializeAudio() {
+                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.audioInitialized = true;
+                console.log('Audio initialized successfully');
+            }
+
+            showPermissionError(error) {
+                let message = '❌ Errore microfono: ';
+                if (error.name === 'NotAllowedError') {
+                    message += 'Permesso negato. Abilita il microfono nelle impostazioni del browser.';
+                } else {
+                    message += error.message;
+                }
+                
+                this.showNotification(message, 'error', 8000);
+                
+                setTimeout(() => {
+                    if (confirm('Vuoi continuare in modalità demo?')) {
+                        this.enableDemoMode();
+                    }
+                }, 2000);
+            }
+
+            enableDemoMode() {
+                this.demoMode = true;
+                this.showNotification('📱 Modalità Demo attivata', 'info');
+                document.getElementById('recordingTip').textContent = 'Modalità Demo - Simulazione attiva';
+            }
+
+            selectVoice(voiceType) {
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                document.querySelector(`[data-voice="${voiceType}"]`).classList.add('selected');
+                
+                this.selectedVoice = voiceType;
+                
+                const voiceNames = {
+                    aria: 'Aria - Tono leggero e ascendente',
+                    acqua: 'Acqua - Tono lento e discendente', 
+                    terra: 'Terra - Tono fermo e strutturato',
+                    fuoco: 'Fuoco - Energia alta e ritmo veloce'
+                };
+                
+                document.getElementById('recordingTip').textContent = `Registra con voce: ${voiceNames[voiceType]}`;
+                console.log(`Selected voice: ${voiceType}`);
+            }
+
+            toggleRecording() {
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            }
+
+            toggleAiRecording() {
+                if (this.isAiRecording) {
+                    this.stopAiRecording();
+                } else {
+                    this.startAiRecording();
+                }
+            }
+
+            startRecording() {
+                if (!this.selectedVoice) {
+                    this.showNotification('⚠️ Seleziona prima una voce da testare', 'warning');
+                    return;
+                }
+
+                if (this.demoMode) {
+                    this.runDemoRecording();
+                    return;
+                }
+
+                if (!this.audioInitialized) {
+                    this.showNotification('❌ Microfono non inizializzato', 'error');
+                    return;
+                }
+
+                try {
+                    this.mediaRecorder = new MediaRecorder(this.stream);
+                    const chunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        chunks.push(e.data);
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'audio/wav' });
+                        this.currentRecording = blob;
+                        this.analyzeTargetedRecording();
+                    };
+
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    this.recordingTime = 0;
+                    
+                    this.updateRecordingUI(true);
+                    this.startTimer();
+                    
+                    console.log('Targeted recording started');
+                } catch (error) {
+                    console.error('Failed to start recording:', error);
+                    this.showNotification('❌ Errore registrazione', 'error');
+                }
+            }
+
+            stopRecording() {
+                if (!this.isRecording) return;
+                
+                this.mediaRecorder.stop();
+                this.isRecording = false;
+                
+                this.updateRecordingUI(false);
+                this.stopTimer();
+                
+                console.log('Targeted recording stopped');
+            }
+
+            startAiRecording() {
+                if (this.demoMode) {
+                    this.runDemoAiRecording();
+                    return;
+                }
+
+                if (!this.audioInitialized) {
+                    this.showNotification('❌ Microfono non inizializzato', 'error');
+                    return;
+                }
+
+                try {
+                    this.mediaRecorder = new MediaRecorder(this.stream);
+                    const chunks = [];
+                    
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        chunks.push(e.data);
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'audio/wav' });
+                        this.currentRecording = blob;
+                        this.analyzeAiRecording();
+                    };
+
+                    this.mediaRecorder.start();
+                    this.isAiRecording = true;
+                    this.aiRecordingTime = 0;
+                    
+                    this.updateAiRecordingUI(true);
+                    this.startAiTimer();
+                    
+                    console.log('AI recording started');
+                } catch (error) {
+                    console.error('Failed to start AI recording:', error);
+                    this.showNotification('❌ Errore registrazione AI', 'error');
+                }
+            }
+
+            stopAiRecording() {
+                if (!this.isAiRecording) return;
+                
+                this.mediaRecorder.stop();
+                this.isAiRecording = false;
+                
+                this.updateAiRecordingUI(false);
+                this.stopAiTimer();
+                
+                console.log('AI recording stopped');
+            }
+
+            runDemoRecording() {
+                this.updateRecordingUI(true);
+                document.getElementById('recordingTimer').textContent = 'DEMO';
+                
+                setTimeout(() => {
+                    this.updateRecordingUI(false);
+                    this.analyzeTargetedRecording();
+                }, 3000);
+            }
+
+            runDemoAiRecording() {
+                this.updateAiRecordingUI(true);
+                document.getElementById('aiRecordingTimer').textContent = 'DEMO';
+                
+                setTimeout(() => {
+                    this.updateAiRecordingUI(false);
+                    this.analyzeAiRecording();
+                }, 3000);
+            }
+
+            updateRecordingUI(recording) {
+                const recordButton = document.getElementById('recordButton');
+                
+                if (recording) {
+                    recordButton.classList.add('recording');
+                    recordButton.textContent = '⏹️';
+                } else {
+                    recordButton.classList.remove('recording');
+                    recordButton.textContent = '🎤';
+                }
+            }
+
+            updateAiRecordingUI(recording) {
+                const recordButton = document.getElementById('aiRecordButton');
+                
+                if (recording) {
+                    recordButton.classList.add('recording');
+                    recordButton.textContent = '⏹️';
+                } else {
+                    recordButton.classList.remove('recording');
+                    recordButton.textContent = '🎤';
+                }
+            }
+
+            startTimer() {
+                this.recordingTimer = setInterval(() => {
+                    this.recordingTime++;
+                    const minutes = Math.floor(this.recordingTime / 60);
+                    const seconds = this.recordingTime % 60;
+                    document.getElementById('recordingTimer').textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.recordingTimer) {
+                    clearInterval(this.recordingTimer);
+                    this.recordingTimer = null;
+                }
+                document.getElementById('recordingTimer').textContent = '00:00';
+            }
+
+            startAiTimer() {
+                this.aiRecordingTimer = setInterval(() => {
+                    this.aiRecordingTime++;
+                    const minutes = Math.floor(this.aiRecordingTime / 60);
+                    const seconds = this.aiRecordingTime % 60;
+                    document.getElementById('aiRecordingTimer').textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }, 1000);
+            }
+
+            stopAiTimer() {
+                if (this.aiRecordingTimer) {
+                    clearInterval(this.aiRecordingTimer);
+                    this.aiRecordingTimer = null;
+                }
+                document.getElementById('aiRecordingTimer').textContent = '00:00';
+            }
+
+            async analyzeTargetedRecording() {
+                this.showNotification('🔍 Analizzando registrazione mirata...', 'info');
+                
+                // Simula l'analisi
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Simula risultati basati sulla voce selezionata
+                const accuracy = 0.7 + Math.random() * 0.25;
+                const isCorrect = Math.random() > 0.3;
+                
+                this.drawRecordedWaveform();
+                this.showNotification(`✅ Analisi completata - Accuratezza: ${Math.round(accuracy * 100)}%`, 'success');
+                
+                // Aggiorna le statistiche
+                this.updateStats();
+                
+                console.log('Targeted analysis completed');
+            }
+
+            async analyzeAiRecording() {
+                this.showNotification('🤖 Analisi AI in corso...', 'info');
+                
+                // Simula l'analisi AI
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                
+                // Genera percentuali realistiche per le 4 voci
+                const percentages = this.generateVoicePercentages();
+                this.displayVoiceAnalysis(percentages);
+                
+                this.drawRecordedWaveform();
+                this.showNotification('✅ Analisi AI completata', 'success');
+                
+                console.log('AI analysis completed', percentages);
+            }
+
+            generateVoicePercentages() {
+                // Genera percentuali che sommano a 100
+                let values = [
+                    Math.random() * 40 + 10, // 10-50%
+                    Math.random() * 30 + 5,  // 5-35%
+                    Math.random() * 25 + 5,  // 5-30%
+                    Math.random() * 20 + 5   // 5-25%
+                ];
+                
+                // Normalizza a 100%
+                const sum = values.reduce((a, b) => a + b, 0);
+                values = values.map(v => (v / sum) * 100);
+                
+                return {
+                    aria: Math.round(values[0]),
+                    acqua: Math.round(values[1]),
+                    terra: Math.round(values[2]),
+                    fuoco: Math.round(values[3])
+                };
+            }
+
+            displayVoiceAnalysis(percentages) {
+                document.getElementById('voiceAnalysis').style.display = 'block';
+                
+                // Trova la voce dominante
+                const highest = Object.keys(percentages).reduce((a, b) => 
+                    percentages[a] > percentages[b] ? a : b
+                );
+                
+                // Aggiorna le barre
+                Object.keys(percentages).forEach(voice => {
+                    const percentage = percentages[voice];
+                    const fill = document.getElementById(`${voice}Fill`);
+                    const value = document.getElementById(`${voice}Value`);
+                    const container = document.getElementById(`${voice}Percentage`);
+                    
+                    // Animazione della barra
+                    setTimeout(() => {
+                        fill.style.width = `${percentage}%`;
+                        fill.textContent = `${percentage}%`;
+                        value.textContent = `${percentage}%`;
+                        
+                        // Evidenzia la voce dominante
+                        if (voice === highest) {
+                            container.classList.add('highest');
+                        } else {
+                            container.classList.remove('highest');
+                        }
+                    }, 300);
+                });
+            }
+
+            drawRecordedWaveform() {
+                const canvas = document.getElementById('recordedCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                
+                // Simula una forma d'onda
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let x = 0; x < canvas.width; x++) {
+                    const y = canvas.height / 2 + Math.sin(x * 0.02) * 50 * Math.random();
+                    if (x === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                
+                document.getElementById('recordedDescription').textContent = 
+                    `Registrazione ${this.demoMode ? 'demo' : 'audio'} - Durata: ${this.recordingTime || this.aiRecordingTime || 3}s`;
+            }
+
+            loadValidationQueue() {
+                const queue = document.getElementById('validationQueue');
+                
+                // Genera campioni di validazione
+                const samples = [
+                    { id: 1, predicted: 'aria', confidence: 0.85, audio: 'sample1.wav' },
+                    { id: 2, predicted: 'fuoco', confidence: 0.72, audio: 'sample2.wav' },
+                    { id: 3, predicted: 'acqua', confidence: 0.91, audio: 'sample3.wav' },
+                    { id: 4, predicted: 'terra', confidence: 0.68, audio: 'sample4.wav' }
+                ];
+                
+                queue.innerHTML = samples.map(sample => this.createValidationItem(sample)).join('');
+            }
+
+            createValidationItem(sample) {
+                const voiceEmojis = {
+                    aria: '🌬️',
+                    acqua: '💧', 
+                    terra: '🌍',
+                    fuoco: '🔥'
+                };
+                
+                return `
+                    <div class="validation-item" data-sample-id="${sample.id}">
+                        <div class="prediction-row">
+                            <div class="prediction-info">
+                                <div class="predicted-voice">
+                                    ${voiceEmojis[sample.predicted]} Predizione: ${sample.predicted.toUpperCase()}
+                                </div>
+                                <div class="confidence">Confidenza: ${Math.round(sample.confidence * 100)}%</div>
+                            </div>
+                            <div class="correction-buttons">
+                                <button class="correction-btn correct" onclick="trainer.markCorrect(${sample.id})">
+                                    ✓ Corretto
+                                </button>
+                                <button class="correction-btn wrong" onclick="trainer.markWrong(${sample.id})">
+                                    ✗ Sbagliato
+                                </button>
+                            </div>
+                        </div>
+                        <div class="voice-correction" id="correction-${sample.id}">
+                            <div class="voice-correct-btn" onclick="trainer.correctVoice(${sample.id}, 'aria')">
+                                🌬️ Aria
+                            </div>
+                            <div class="voice-correct-btn" onclick="trainer.correctVoice(${sample.id}, 'acqua')">
+                                💧 Acqua  
+                            </div>
+                            <div class="voice-correct-btn" onclick="trainer.correctVoice(${sample.id}, 'terra')">
+                                🌍 Terra
+                            </div>
+                            <div class="voice-correct-btn" onclick="trainer.correctVoice(${sample.id}, 'fuoco')">
+                                🔥 Fuoco
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            markCorrect(sampleId) {
+                this.showNotification('✅ Marcato come corretto', 'success');
+                this.removeSample(sampleId);
+                this.updateStats();
+            }
+
+            markWrong(sampleId) {
+                const correctionDiv = document.getElementById(`correction-${sampleId}`);
+                correctionDiv.classList.add('show');
+                this.showNotification('📝 Seleziona la voce corretta', 'info');
+            }
+
+            correctVoice(sampleId, correctVoice) {
+                this.showNotification(`✅ Corretto in: ${correctVoice.toUpperCase()}`, 'success');
+                this.removeSample(sampleId);
+                this.updateStats();
+            }
+
+            removeSample(sampleId) {
+                const sample = document.querySelector(`[data-sample-id="${sampleId}"]`);
+                if (sample) {
+                    sample.style.animation = 'fadeOut 0.3s ease';
+                    setTimeout(() => sample.remove(), 300);
+                }
+            }
+
+            updateStats() {
+                // Aggiorna statistiche in modo realistico
+                const currentCorrect = parseInt(document.getElementById('correctPredictions').textContent);
+                const currentNeedsCorrection = parseInt(document.getElementById('needsCorrection').textContent);
+                
+                document.getElementById('correctPredictions').textContent = currentCorrect + 1;
+                document.getElementById('needsCorrection').textContent = Math.max(0, currentNeedsCorrection - 1);
+                
+                // Ricalcola accuratezza
+                const total = parseInt(document.getElementById('validatedSamples').textContent);
+                const correct = parseInt(document.getElementById('correctPredictions').textContent);
+                const accuracy = Math.round((correct / total) * 100);
+                document.getElementById('overallAccuracy').textContent = accuracy + '%';
+            }
+
+            showNotification(message, type = 'info', duration = 4000) {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, duration);
+            }
+
+            cleanup() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                }
+                if (this.recordingTimer) {
+                    clearInterval(this.recordingTimer);
+                }
+                if (this.aiRecordingTimer) {
+                    clearInterval(this.aiRecordingTimer);
+                }
+            }
+        }
+
+        // Funzioni globali per i pulsanti onclick
+        let trainer;
+
+        function playRecorded() {
+            trainer.showNotification('▶️ Riproduzione audio...', 'info');
+        }
+
+        function analyzeRecorded() {
+            if (trainer.currentRecording) {
+                trainer.showNotification('🔍 Rianalizzando registrazione...', 'info');
+            } else {
+                trainer.showNotification('❌ Nessuna registrazione da analizzare', 'warning');
+            }
+        }
+
+        function saveRecording() {
+            if (trainer.currentRecording) {
+                trainer.showNotification('💾 Registrazione salvata nel dataset', 'success');
+            } else {
+                trainer.showNotification('❌ Nessuna registrazione da salvare', 'warning');
+            }
+        }
+
+        function showWaveform(voice) {
+            const canvas = document.getElementById('waveformCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Pattern specifici per ogni voce
+            const patterns = {
+                aria: { freq: 0.05, amp: 60, color: '#74b9ff' },
+                acqua: { freq: 0.02, amp: 40, color: '#00b894' },
+                terra: { freq: 0.03, amp: 80, color: '#fdcb6e' },
+                fuoco: { freq: 0.08, amp: 90, color: '#fd79a8' }
+            };
+            
+            const pattern = patterns[voice];
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = pattern.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            for (let x = 0; x < canvas.width; x++) {
+                const y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp;
+                if (x === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+            
+            const descriptions = {
+                aria: 'Pattern ascendente con frequenze acute - Energia crescente',
+                acqua: 'Onde lunghe e fluide - Tono discendente e morbido',
+                terra: 'Pattern stabile e strutturato - Frequenze medie costanti',
+                fuoco: 'Oscillazioni rapide e intense - Energia alta e variabile'
+            };
+            
+            document.getElementById('waveformDescription').textContent = descriptions[voice];
+            trainer.showNotification(`📊 Visualizzando pattern: ${voice.toUpperCase()}`, 'info');
+        }
+
+        function generateNewSamples() {
+            trainer.showNotification('🔄 Generando nuovi campioni per validazione...', 'info');
+            setTimeout(() => {
+                trainer.loadValidationQueue();
+                trainer.showNotification('✅ Nuovi campioni generati', 'success');
+            }, 2000);
+        }
+
+        // Inizializza l'applicazione
+        document.addEventListener('DOMContentLoaded', () => {
+            trainer = new VoiceBreakTrainer();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (trainer) {
+                trainer.cleanup();
+            }
+        });
+
+        // Aggiungi animazione CSS per fadeOut
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeOut {
+                from { opacity: 1; transform: translateX(0); }
+                to { opacity: 0; transform: translateX(-100%); }
+            }
+        `;
+        document.head.appendChild(style);
+
         console.log('🎯 Voice Break Trainer caricato correttamente!');
     </script>
 </body>
