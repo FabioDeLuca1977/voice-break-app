@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafici di Analisi Vocale - Voice Break</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.1);
+            padding: 20px;
+            color: white;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-panel {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        .chart-title {
+            font-size: 1.4em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        .chart-description {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 0.9em;
+            color: #666;
+            border-left: 4px solid #3498db;
+        }
+
+        .voice-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .voice-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .voice-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .voice-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .voice-name {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .voice-characteristics {
+            list-style: none;
+            text-align: left;
+        }
+
+        .voice-characteristics li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+            font-size: 0.9em;
+        }
+
+        .voice-characteristics li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #3498db;
+            font-weight: bold;
+        }
+
+        .aria { border-left: 4px solid #74b9ff; }
+        .acqua { border-left: 4px solid #00b894; }
+        .terra { border-left: 4px solid #fdcb6e; }
+        .fuoco { border-left: 4px solid #fd79a8; }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .live-demo {
+            background: linear-gradient(135deg, #e8f4fd 0%, #f0f9ff 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 30px 0;
+            border: 2px solid #3498db;
+        }
+
+        .demo-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .demo-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .demo-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .demo-btn.active {
+            background: #e74c3c;
+        }
+
+        .waveform-display {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .voice-comparison {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Grafici di Analisi Vocale</h1>
+        <p>Sistema di apprendimento interattivo per le 4 voci elementali</p>
+    </div>
+
+    <div class="container">
+        <!-- Voice Characteristics Comparison -->
+        <div class="voice-comparison">
+            <div class="voice-card aria">
+                <span class="voice-icon">🌬️</span>
+                <div class="voice-name">ARIA</div>
+                <ul class="voice-characteristics">
+                    <li>Toni in salita</li>
+                    <li>Volume medio-alto (75%)</li>
+                    <li>Ritmo medio-alto</li>
+                    <li>Pause poche</li>
+                    <li>Stile presentatore</li>
+                </ul>
+            </div>
+
+            <div class="voice-card acqua">
+                <span class="voice-icon">💧</span>
+                <div class="voice-name">ACQUA</div>
+                <ul class="voice-characteristics">
+                    <li>Tono in discesa</li>
+                    <li>Vocali allungate</li>
+                    <li>Volume basso (30%)</li>
+                    <li>Ritmo calmo</li>
+                    <li>Pause lunghe</li>
+                </ul>
+            </div>
+
+            <div class="voice-card terra">
+                <span class="voice-icon">🌍</span>
+                <div class="voice-name">TERRA</div>
+                <ul class="voice-characteristics">
+                    <li>Tono in discesa netto</li>
+                    <li>Frasi nette</li>
+                    <li>Volume medio (50%)</li>
+                    <li>Ritmo come marcia</li>
+                    <li>Stabilità costante</li>
+                </ul>
+            </div>
+
+            <div class="voice-card fuoco">
+                <span class="voice-icon">🔥</span>
+                <div class="voice-name">FUOCO</div>
+                <ul class="voice-characteristics">
+                    <li>Tono in salita</li>
+                    <li>Volume alto (90%)</li>
+                    <li>Ritmo veloce</li>
+                    <li>Pause corte e poche</li>
+                    <li>Energia esplosiva</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+            <!-- Timeline Analysis -->
+            <div class="chart-panel full-width">
+                <h3 class="chart-title">📈 Analisi Temporale della Voce</h3>
+                <div class="chart-container">
+                    <canvas id="radarChart"></canvas>
+                </div>
+                <div class="chart-description">
+                    Questo grafico mostra l'evoluzione della voce nel tempo. I colori della linea cambiano per indicare la voce dominante in ogni segmento. I punti di transizione sono evidenziati. Perfetto per analizzare pezzi lunghi e vedere come cambia l'espressione vocale.
+                </div>
+            </div>
+
+            <!-- Volume Comparison -->
+            <div class="chart-panel">
+                <h3 class="chart-title">🔊 Confronto Volumi</h3>
+                <div class="chart-container">
+                    <canvas id="volumeChart"></canvas>
+                </div>
+                <div class="chart-description">
+                    Mostra i livelli di volume caratteristici di ogni voce, dall'intimo sussurro dell'Acqua al potente grido del Fuoco.
+                </div>
+            </div>
+
+            <!-- Rhythm Analysis -->
+            <div class="chart-panel">
+                <h3 class="chart-title">⏱️ Analisi del Ritmo</h3>
+                <div class="chart-container">
+                    <canvas id="rhythmChart"></canvas>
+                </div>
+                <div class="chart-description">
+                    Confronta la velocità di parlata delle diverse voci, dal ritmo calmo dell'Acqua alla rapidità incalzante del Fuoco.
+                </div>
+            </div>
+
+            <!-- Pitch Pattern -->
+            <div class="chart-panel">
+                <h3 class="chart-title">🎵 Pattern Tonali</h3>
+                <div class="chart-container">
+                    <canvas id="pitchChart"></canvas>
+                </div>
+                <div class="chart-description">
+                    Visualizza come si muove il tono nel tempo: l'Aria e il Fuoco salgono, mentre Acqua e Terra scendono con stili diversi.
+                </div>
+            </div>
+
+            <!-- Pause Analysis -->
+            <div class="chart-panel">
+                <h3 class="chart-title">⏸️ Analisi Pause</h3>
+                <div class="chart-container">
+                    <canvas id="pauseChart"></canvas>
+                </div>
+                <div class="chart-description">
+                    Confronta frequenza e durata delle pause: l'Acqua usa pause lunghe e frequenti, il Fuoco quasi non si ferma mai. <strong>Clicca per cambiare voce!</strong>
+                </div>
+            </div>
+
+            <!-- Energy Flow -->
+            <div class="chart-panel">
+                <h3 class="chart-title">⚡ Flusso di Energia</h3>
+                <div class="chart-container">
+                    <canvas id="energyChart"></canvas>
+                </div>
+                <div class="chart-description">
+                    Mostra come l'energia vocale si sviluppa nel tempo, dall'esplosione del Fuoco alla calma costante della Terra.
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Demo Section -->
+        <div class="live-demo">
+            <h3 class="chart-title">🎤 Demo Interattiva - Analisi Temporale</h3>
+            <div class="demo-controls">
+                <button class="demo-btn" onclick="simulateVoice('aria')">🌬️ Simula Aria</button>
+                <button class="demo-btn" onclick="simulateVoice('acqua')">💧 Simula Acqua</button>
+                <button class="demo-btn" onclick="simulateVoice('terra')">🌍 Simula Terra</button>
+                <button class="demo-btn" onclick="simulateVoice('fuoco')">🔥 Simula Fuoco</button>
+                <button class="demo-btn" onclick="simulateLongPiece()">🎵 Pezzo Lungo</button>
+                <button class="demo-btn" onclick="stopSimulation()">⏹️ Stop</button>
+            </div>
+            
+            <div class="waveform-display">
+                <canvas id="liveWaveform" width="800" height="200"></canvas>
+                <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <div id="currentVoice" style="font-weight: bold; font-size: 1.1em;">Voce Corrente: --</div>
+                    <div id="timeProgress" style="color: #666;">Tempo: 0.0s</div>
+                </div>
+                <div id="voiceTimeline" style="height: 20px; background: #f0f0f0; border-radius: 10px; margin-top: 10px; overflow: hidden;">
+                    <!-- Timeline dinamica -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Caricamento dinamico di Chart.js con fallback
+        function loadChartJS() {
+            return new Promise((resolve, reject) => {
+                if (typeof Chart !== 'undefined') {
+                    resolve();
+                    return;
+                }
+
+                // Prova primo CDN
+                const script1 = document.createElement('script');
+                script1.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js';
+                script1.onload = () => {
+                    console.log('✅ Chart.js caricato da jsdelivr');
+                    resolve();
+                };
+                script1.onerror = () => {
+                    console.log('❌ Fallito jsdelivr, provo unpkg...');
+                    
+                    // Prova secondo CDN
+                    const script2 = document.createElement('script');
+                    script2.src = 'https://unpkg.com/chart.js@4.4.0/dist/chart.min.js';
+                    script2.onload = () => {
+                        console.log('✅ Chart.js caricato da unpkg');
+                        resolve();
+                    };
+                    script2.onerror = () => {
+                        console.log('❌ Fallito unpkg, provo cdnjs...');
+                        
+                        // Prova terzo CDN
+                        const script3 = document.createElement('script');
+                        script3.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js';
+                        script3.onload = () => {
+                            console.log('✅ Chart.js caricato da cdnjs');
+                            resolve();
+                        };
+                        script3.onerror = () => {
+                            console.error('❌ Tutti i CDN Chart.js falliti');
+                            reject(new Error('Chart.js non disponibile'));
+                        };
+                        
+                        document.head.appendChild(script3);
+                    };
+                    
+                    document.head.appendChild(script2);
+                };
+                
+                document.head.appendChild(script1);
+            });
+        }
+
+        // Versione fallback senza Chart.js
+        function createFallbackCharts() {
+            console.log('📊 Creando grafici fallback senza Chart.js...');
+            
+            // Sostituisce ogni canvas con un grafico SVG semplice
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+                const container = canvas.parentElement;
+                const chartType = canvas.id;
+                
+                container.innerHTML = createSVGChart(chartType);
+            });
+        }
+
+        function createSVGChart(chartType) {
+            const svgBase = `
+                <svg width="100%" height="300" style="background: white; border-radius: 10px;">
+                    <defs>
+                        <linearGradient id="ariaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#74b9ff;stop-opacity:0.8" />
+                            <stop offset="100%" style="stop-color:#0984e3;stop-opacity:0.8" />
+                        </linearGradient>
+                        <linearGradient id="acquaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#00b894;stop-opacity:0.8" />
+                            <stop offset="100%" style="stop-color:#00a085;stop-opacity:0.8" />
+                        </linearGradient>
+                        <linearGradient id="terraGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#fdcb6e;stop-opacity:0.8" />
+                            <stop offset="100%" style="stop-color:#e17055;stop-opacity:0.8" />
+                        </linearGradient>
+                        <linearGradient id="fuocoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#fd79a8;stop-opacity:0.8" />
+                            <stop offset="100%" style="stop-color:#e84393;stop-opacity:0.8" />
+                        </linearGradient>
+                    </defs>
+            `;
+
+            switch(chartType) {
+                case 'radarChart':
+                    return svgBase + `
+                        <text x="50%" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">Analisi Temporale della Voce</text>
+                        
+                        <!-- Griglia temporale -->
+                        <defs>
+                            <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
+                                <path d="M 40 0 L 0 0 0 20" fill="none" stroke="#f0f0f0" stroke-width="1"/>
+                            </pattern>
+                        </defs>
+                        <rect x="50" y="50" width="400" height="180" fill="url(#grid)" opacity="0.5"/>
+                        
+                        <!-- Assi -->
+                        <line x1="50" y1="230" x2="450" y2="230" stroke="#333" stroke-width="2"/>
+                        <line x1="50" y1="50" x2="50" y2="230" stroke="#333" stroke-width="2"/>
+                        
+                        <!-- Etichette tempo -->
+                        <text x="50" y="250" text-anchor="middle" font-size="10" fill="#666">0s</text>
+                        <text x="150" y="250" text-anchor="middle" font-size="10" fill="#666">5s</text>
+                        <text x="250" y="250" text-anchor="middle" font-size="10" fill="#666">10s</text>
+                        <text x="350" y="250" text-anchor="middle" font-size="10" fill="#666">15s</text>
+                        <text x="450" y="250" text-anchor="middle" font-size="10" fill="#666">20s</text>
+                        
+                        <!-- Etichette volume -->
+                        <text x="40" y="235" text-anchor="end" font-size="10" fill="#666">0%</text>
+                        <text x="40" y="185" text-anchor="end" font-size="10" fill="#666">25%</text>
+                        <text x="40" y="140" text-anchor="end" font-size="10" fill="#666">50%</text>
+                        <text x="40" y="95" text-anchor="end" font-size="10" fill="#666">75%</text>
+                        <text x="40" y="55" text-anchor="end" font-size="10" fill="#666">100%</text>
+                        
+                        <!-- Linea temporale con cambi di voce -->
+                        <!-- Segmento ARIA (0-5s) -->
+                        <path d="M50,180 Q90,160 130,140 Q150,130 170,120" fill="none" stroke="#74b9ff" stroke-width="4"/>
+                        <circle cx="50" cy="180" r="3" fill="#74b9ff"/>
+                        <text x="55" y="175" font-size="10" fill="#74b9ff" font-weight="bold">ARIA</text>
+                        
+                        <!-- Transizione a ACQUA (5-8s) -->
+                        <path d="M170,120 Q190,130 210,150 Q230,170 250,190" fill="none" stroke="#00b894" stroke-width="4"/>
+                        <circle cx="210" cy="150" r="3" fill="#00b894"/>
+                        <text x="215" y="145" font-size="10" fill="#00b894" font-weight="bold">ACQUA</text>
+                        
+                        <!-- Segmento TERRA (8-12s) -->
+                        <path d="M250,190 Q270,185 290,180 Q310,175 330,170" fill="none" stroke="#fdcb6e" stroke-width="4"/>
+                        <circle cx="290" cy="180" r="3" fill="#fdcb6e"/>
+                        <text x="295" y="175" font-size="10" fill="#fdcb6e" font-weight="bold">TERRA</text>
+                        
+                        <!-- Esplosione FUOCO (12-20s) -->
+                        <path d="M330,170 Q350,120 370,80 Q390,60 410,50 Q430,45 450,40" fill="none" stroke="#fd79a8" stroke-width="4"/>
+                        <circle cx="390" cy="60" r="3" fill="#fd79a8"/>
+                        <text x="395" y="55" font-size="10" fill="#fd79a8" font-weight="bold">FUOCO</text>
+                        
+                        <!-- Indicatori di transizione -->
+                        <circle cx="170" cy="120" r="4" fill="white" stroke="#666" stroke-width="2"/>
+                        <circle cx="250" cy="190" r="4" fill="white" stroke="#666" stroke-width="2"/>
+                        <circle cx="330" cy="170" r="4" fill="white" stroke="#666" stroke-width="2"/>
+                        
+                        <!-- Timeline sotto -->
+                        <rect x="50" y="260" width="80" height="8" fill="#74b9ff" opacity="0.7" rx="4"/>
+                        <rect x="130" y="260" width="60" height="8" fill="#00b894" opacity="0.7" rx="4"/>
+                        <rect x="190" y="260" width="80" height="8" fill="#fdcb6e" opacity="0.7" rx="4"/>
+                        <rect x="270" y="260" width="180" height="8" fill="#fd79a8" opacity="0.7" rx="4"/>
+                        
+                        <!-- Legenda dinamica -->
+                        <text x="470" y="80" font-size="12" fill="#666" font-weight="bold">Voce Dominante:</text>
+                        <rect x="470" y="90" width="15" height="3" fill="#74b9ff"/>
+                        <text x="490" y="97" font-size="11" fill="#74b9ff">🌬️ Aria (0-5s)</text>
+                        <rect x="470" y="110" width="15" height="3" fill="#00b894"/>
+                        <text x="490" y="117" font-size="11" fill="#00b894">💧 Acqua (5-8s)</text>
+                        <rect x="470" y="130" width="15" height="3" fill="#fdcb6e"/>
+                        <text x="490" y="137" font-size="11" fill="#fdcb6e">🌍 Terra (8-12s)</text>
+                        <rect x="470" y="150" width="15" height="3" fill="#fd79a8"/>
+                        <text x="490" y="157" font-size="11" fill="#fd79a8">🔥 Fuoco (12-20s)</text>
+                        
+                        <text x="470" y="180" font-size="10" fill="#999">● Punti di transizione</text>
+                        <text x="470" y="195" font-size="10" fill="#999">Timeline: evoluzione voce</text>
+                    </svg>`;
+
+                case 'volumeChart':
+                    return svgBase + `
+                        <text x="50%" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">Confronto Volumi</text>
+                        <rect x="50" y="50" width="40" height="150" fill="url(#ariaGrad)" rx="5"/>
+                        <rect x="150" y="170" width="40" height="60" fill="url(#acquaGrad)" rx="5"/>
+                        <rect x="250" y="130" width="40" height="100" fill="url(#terraGrad)" rx="5"/>
+                        <rect x="350" y="70" width="40" height="180" fill="url(#fuocoGrad)" rx="5"/>
+                        <text x="70" y="270" text-anchor="middle" font-size="12" fill="#666">🌬️ Aria</text>
+                        <text x="170" y="270" text-anchor="middle" font-size="12" fill="#666">💧 Acqua</text>
+                        <text x="270" y="270" text-anchor="middle" font-size="12" fill="#666">🌍 Terra</text>
+                        <text x="370" y="270" text-anchor="middle" font-size="12" fill="#666">🔥 Fuoco</text>
+                        <text x="15" y="60" font-size="10" fill="#666">75%</text>
+                        <text x="15" y="180" font-size="10" fill="#666">30%</text>
+                        <text x="15" y="140" font-size="10" fill="#666">50%</text>
+                        <text x="15" y="80" font-size="10" fill="#666">90%</text>
+                    </svg>`;
+
+                case 'rhythmChart':
+                    return svgBase + `
+                        <text x="50%" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">Analisi del Ritmo</text>
+                        <polyline fill="none" stroke="#74b9ff" stroke-width="3" points="50,200 150,180 250,170 350,150"/>
+                        <polyline fill="none" stroke="#00b894" stroke-width="3" points="50,180 150,190 250,200 350,220"/>
+                        <polyline fill="none" stroke="#fdcb6e" stroke-width="3" points="50,170 150,170 250,170 350,170"/>
+                        <polyline fill="none" stroke="#fd79a8" stroke-width="3" points="50,160 150,120 250,100 350,80"/>
+                        <text x="50" y="270" text-anchor="middle" font-size="12" fill="#666">Inizio</text>
+                        <text x="150" y="270" text-anchor="middle" font-size="12" fill="#666">Sviluppo</text>
+                        <text x="250" y="270" text-anchor="middle" font-size="12" fill="#666">Climax</text>
+                        <text x="350" y="270" text-anchor="middle" font-size="12" fill="#666">Fine</text>
+                    </svg>`;
+
+                case 'pitchChart':
+                    return svgBase + `
+                        <text x="50%" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">Pattern Tonali</text>
+                        <path d="M50,200 Q150,180 250,160 T450,120" fill="none" stroke="#74b9ff" stroke-width="3"/>
+                        <path d="M50,120 Q150,140 250,160 T450,200" fill="none" stroke="#00b894" stroke-width="3"/>
+                        <path d="M50,140 Q150,150 250,160 T450,180" fill="none" stroke="#fdcb6e" stroke-width="3"/>
+                        <path d="M50,180 Q150,160 250,140 T450,100" fill="none" stroke="#fd79a8" stroke-width="3"/>
+                        <text x="60" y="50" font-size="12" fill="#74b9ff">🌬️ Aria - Salita</text>
+                        <text x="60" y="70" font-size="12" fill="#00b894">💧 Acqua - Discesa</text>
+                        <text x="250" y="50" font-size="12" fill="#fdcb6e">🌍 Terra - Netta</text>
+                        <text x="250" y="70" font-size="12" fill="#fd79a8">🔥 Fuoco - Energica</text>
+                    </svg>`;
+
+                case 'pauseChart':
+                    return svgBase + `
+                        <text x="50%" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">Analisi Pause - Aria</text>
+                        <circle cx="200" cy="150" r="80" fill="none" stroke="#74b9ff" stroke-width="15" stroke-dasharray="400 100"/>
+                        <circle cx="200" cy="150" r="80" fill="none" stroke="#74b9ff" stroke-width="15" stroke-dasharray="100 400" stroke-dashoffset="-400" opacity="0.3"/>
+                        <text x="200" y="150" text-anchor="middle" font-size="14" fill="#666">80% Parlato</text>
+                        <text x="200" y="170" text-anchor="middle" font-size="12" fill="#666">20% Pause</text>
+                        <text x="200" y="260" text-anchor="middle" font-size="10" fill="#999">Clicca per cambiare voce</text>
+                    </svg>`;
+
+                case 'energyChart':
+                    return svgBase + `
+                        <text x="50%" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#2c3e50">Flusso di Energia</text>
+                        <polygon points="200,50 250,100 300,80 280,150 220,150 150,100" fill="url(#ariaGrad)" opacity="0.6"/>
+                        <polygon points="200,50 250,100 280,120 250,180 150,180 120,120" fill="url(#acquaGrad)" opacity="0.6"/>
+                        <polygon points="200,50 280,90 300,150 250,200 150,200 100,150" fill="url(#terraGrad)" opacity="0.6"/>
+                        <polygon points="200,50 300,80 320,140 280,220 120,220 80,140" fill="url(#fuocoGrad)" opacity="0.6"/>
+                        <text x="60" y="50" font-size="12" fill="#74b9ff">🌬️ Aria</text>
+                        <text x="60" y="70" font-size="12" fill="#00b894">💧 Acqua</text>
+                        <text x="60" y="90" font-size="12" fill="#fdcb6e">🌍 Terra</text>
+                        <text x="60" y="110" font-size="12" fill="#fd79a8">🔥 Fuoco</text>
+                    </svg>`;
+
+                default:
+                    return svgBase + `
+                        <text x="50%" y="150" text-anchor="middle" font-size="16" fill="#666">
+                            Grafico ${chartType} non disponibile
+                        </text>
+                    </svg>`;
+            }
+        }
+
+        // Color schemes for each voice
+        const voiceColors = {
+            aria: { primary: '#74b9ff', secondary: 'rgba(116, 185, 255, 0.3)', accent: '#0984e3' },
+            acqua: { primary: '#00b894', secondary: 'rgba(0, 184, 148, 0.3)', accent: '#00a085' },
+            terra: { primary: '#fdcb6e', secondary: 'rgba(253, 203, 110, 0.3)', accent: '#e17055' },
+            fuoco: { primary: '#fd79a8', secondary: 'rgba(253, 121, 168, 0.3)', accent: '#e84393' }
+        };
+
+        // Voice characteristics data
+        const voiceData = {
+            aria: { volume: 75, rhythm: 70, pitch: 80, pauseFreq: 20, energy: 75 },
+            acqua: { volume: 30, rhythm: 25, pitch: 20, pauseFreq: 90, energy: 35 },
+            terra: { volume: 50, rhythm: 55, pitch: 30, pauseFreq: 40, energy: 60 },
+            fuoco: { volume: 90, rhythm: 95, pitch: 85, pauseFreq: 10, energy: 95 }
+        };
+
+        // Initialize all charts
+        function initCharts() {
+            createRadarChart();
+            createVolumeChart();
+            createRhythmChart();
+            createPitchChart();
+            createPauseChart();
+            createEnergyChart();
+            initLiveWaveform();
+        }
+
+        // Radar Chart
+        function createRadarChart() {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Volume', 'Ritmo', 'Altezza Tono', 'Pause', 'Energia'],
+                    datasets: [
+                        {
+                            label: 'Aria',
+                            data: [75, 70, 80, 20, 75],
+                            borderColor: voiceColors.aria.primary,
+                            backgroundColor: voiceColors.aria.secondary,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Acqua',
+                            data: [30, 25, 20, 90, 35],
+                            borderColor: voiceColors.acqua.primary,
+                            backgroundColor: voiceColors.acqua.secondary,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Terra',
+                            data: [50, 55, 30, 40, 60],
+                            borderColor: voiceColors.terra.primary,
+                            backgroundColor: voiceColors.terra.secondary,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Fuoco',
+                            data: [90, 95, 85, 10, 95],
+                            borderColor: voiceColors.fuoco.primary,
+                            backgroundColor: voiceColors.fuoco.secondary,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // Volume Chart
+        function createVolumeChart() {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['🌬️ Aria', '💧 Acqua', '🌍 Terra', '🔥 Fuoco'],
+                    datasets: [{
+                        label: 'Volume (%)',
+                        data: [75, 30, 50, 90],
+                        backgroundColor: [
+                            voiceColors.aria.primary,
+                            voiceColors.acqua.primary,
+                            voiceColors.terra.primary,
+                            voiceColors.fuoco.primary
+                        ],
+                        borderRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, max: 100 }
+                    }
+                }
+            });
+        }
+
+        // Rhythm Chart
+        function createRhythmChart() {
+            const ctx = document.getElementById('rhythmChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Inizio', 'Sviluppo', 'Climax', 'Fine'],
+                    datasets: [
+                        {
+                            label: 'Aria',
+                            data: [60, 70, 75, 80],
+                            borderColor: voiceColors.aria.primary,
+                            backgroundColor: voiceColors.aria.secondary,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Acqua',
+                            data: [30, 25, 20, 15],
+                            borderColor: voiceColors.acqua.primary,
+                            backgroundColor: voiceColors.acqua.secondary,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Terra',
+                            data: [55, 55, 55, 55],
+                            borderColor: voiceColors.terra.primary,
+                            backgroundColor: voiceColors.terra.secondary,
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'Fuoco',
+                            data: [80, 90, 95, 100],
+                            borderColor: voiceColors.fuoco.primary,
+                            backgroundColor: voiceColors.fuoco.secondary,
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+
+        // Pitch Chart
+        function createPitchChart() {
+            const ctx = document.getElementById('pitchChart').getContext('2d');
+            
+            const timePoints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timePoints,
+                    datasets: [
+                        {
+                            label: 'Aria - Salita',
+                            data: timePoints.map(t => 50 + t * 3),
+                            borderColor: voiceColors.aria.primary,
+                            tension: 0.4,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Acqua - Discesa',
+                            data: timePoints.map(t => 70 - t * 2),
+                            borderColor: voiceColors.acqua.primary,
+                            tension: 0.6,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Terra - Discesa Netta',
+                            data: timePoints.map(t => 60 - t * 1.5),
+                            borderColor: voiceColors.terra.primary,
+                            tension: 0.1,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Fuoco - Salita Energica',
+                            data: timePoints.map(t => 45 + t * 4),
+                            borderColor: voiceColors.fuoco.primary,
+                            tension: 0.3,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Tempo (s)' } },
+                        y: { title: { display: true, text: 'Tono (Hz)' } }
+                    }
+                }
+            });
+        }
+
+        // Pause Chart (Interactive)
+        let currentPauseVoice = 0;
+        const pauseVoices = ['aria', 'acqua', 'terra', 'fuoco'];
+        const pauseData = {
+            aria: [80, 20],
+            acqua: [40, 60],
+            terra: [70, 30],
+            fuoco: [90, 10]
+        };
+
+        function createPauseChart() {
+            const ctx = document.getElementById('pauseChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Parlato', 'Pause'],
+                    datasets: [{
+                        data: pauseData.aria,
+                        backgroundColor: [voiceColors.aria.primary, voiceColors.aria.secondary],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: 'Aria - Clicca per cambiare' }
+                    },
+                    onClick: cyclePauseChart
+                }
+            });
+        }
+
+        function cyclePauseChart() {
+            currentPauseVoice = (currentPauseVoice + 1) % 4;
+            const voice = pauseVoices[currentPauseVoice];
+            const chart = Chart.getChart('pauseChart');
+            
+            chart.data.datasets[0].data = pauseData[voice];
+            chart.data.datasets[0].backgroundColor = [voiceColors[voice].primary, voiceColors[voice].secondary];
+            chart.options.plugins.title.text = `${voice.charAt(0).toUpperCase() + voice.slice(1)} - Clicca per cambiare`;
+            chart.update();
+        }
+
+        // Energy Chart
+        function createEnergyChart() {
+            const ctx = document.getElementById('energyChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['0s', '2s', '4s', '6s', '8s', '10s'],
+                    datasets: [
+                        {
+                            label: 'Aria',
+                            data: [50, 60, 70, 75, 80, 85],
+                            borderColor: voiceColors.aria.primary,
+                            backgroundColor: voiceColors.aria.secondary
+                        },
+                        {
+                            label: 'Acqua',
+                            data: [40, 35, 30, 25, 20, 15],
+                            borderColor: voiceColors.acqua.primary,
+                            backgroundColor: voiceColors.acqua.secondary
+                        },
+                        {
+                            label: 'Terra',
+                            data: [60, 60, 60, 60, 60, 60],
+                            borderColor: voiceColors.terra.primary,
+                            backgroundColor: voiceColors.terra.secondary
+                        },
+                        {
+                            label: 'Fuoco',
+                            data: [70, 85, 95, 90, 95, 100],
+                            borderColor: voiceColors.fuoco.primary,
+                            backgroundColor: voiceColors.fuoco.secondary
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { r: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+
+        // Live Waveform Demo con timeline temporale
+        let animationId;
+        let isSimulating = false;
+        let currentTime = 0;
+        let voiceScript = null;
+
+        // Script per pezzo lungo (sequenza di voci nel tempo)
+        const longPieceScript = [
+            { start: 0, end: 4, voice: 'aria', description: 'Apertura energica' },
+            { start: 4, end: 8, voice: 'acqua', description: 'Transizione fluida' },
+            { start: 8, end: 12, voice: 'terra', description: 'Consolidamento' },
+            { start: 12, end: 16, voice: 'fuoco', description: 'Crescendo finale' },
+            { start: 16, end: 20, voice: 'aria', description: 'Chiusura elevata' }
+        ];
+
+        function initLiveWaveform() {
+            try {
+                const canvas = document.getElementById('liveWaveform');
+                if (!canvas) {
+                    console.warn('Canvas liveWaveform non trovato');
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.warn('Impossibile ottenere context 2d');
+                    return;
+                }
+                
+                // Set canvas size
+                canvas.width = 800;
+                canvas.height = 200;
+                
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.strokeStyle = '#dee2e6';
+                ctx.lineWidth = 1;
+                const centerY = canvas.height / 2;
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(canvas.width, centerY);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Clicca su una voce per vedere l\'analisi temporale', canvas.width / 2, centerY + 5);
+                
+                // Reset UI elements
+                updateVoiceUI('--', 0);
+                updateTimeline([]);
+                
+                console.log('✅ Live waveform inizializzato');
+            } catch (error) {
+                console.error('❌ Errore inizializzazione waveform:', error);
+            }
+        }
+            try {
+                stopSimulation();
+                
+                document.querySelectorAll('.demo-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                
+                isSimulating = true;
+                currentTime = 0;
+                voiceScript = [...longPieceScript];
+                
+                // Setup timeline
+                updateTimeline(voiceScript);
+                
+                const canvas = document.getElementById('liveWaveform');
+                if (!canvas) return;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                
+                function animate() {
+                    if (!isSimulating) return;
+                    
+                    // Find current voice based on time
+                    const currentSegment = voiceScript.find(segment => 
+                        currentTime >= segment.start && currentTime < segment.end
+                    );
+                    
+                    const currentVoice = currentSegment ? currentSegment.voice : 'aria';
+                    const description = currentSegment ? currentSegment.description : '';
+                    
+                    // Update UI
+                    updateVoiceUI(currentVoice, currentTime, description);
+                    updateTimelineProgress(currentTime);
+                    
+                    // Draw waveform
+                    drawTemporalWaveform(ctx, canvas, currentVoice, currentTime);
+                    
+                    currentTime += 0.05;
+                    
+                    // Reset after 20 seconds
+                    if (currentTime > 20) {
+                        currentTime = 0;
+                    }
+                    
+                    animationId = requestAnimationFrame(animate);
+                }
+                
+                animate();
+                console.log('🎵 Simulando pezzo lungo con cambi di voce');
+            } catch (error) {
+                console.error('❌ Errore simulazione pezzo lungo:', error);
+            }
+        }
+
+        function simulateLongPiece() {
+            try {
+                stopSimulation();
+                
+                document.querySelectorAll('.demo-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                
+                isSimulating = true;
+                currentTime = 0;
+                voiceScript = [...longPieceScript];
+                
+                // Setup timeline
+                updateTimeline(voiceScript);
+                
+                const canvas = document.getElementById('liveWaveform');
+                if (!canvas) return;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                
+                function animate() {
+                    if (!isSimulating) return;
+                    
+                    // Find current voice based on time
+                    const currentSegment = voiceScript.find(segment => 
+                        currentTime >= segment.start && currentTime < segment.end
+                    );
+                    
+                    const currentVoice = currentSegment ? currentSegment.voice : 'aria';
+                    const description = currentSegment ? currentSegment.description : '';
+                    
+                    // Update UI
+                    updateVoiceUI(currentVoice, currentTime, description);
+                    updateTimelineProgress(currentTime);
+                    
+                    // Draw waveform
+                    drawTemporalWaveform(ctx, canvas, currentVoice, currentTime);
+                    
+                    currentTime += 0.05;
+                    
+                    // Reset after 20 seconds
+                    if (currentTime > 20) {
+                        currentTime = 0;
+                    }
+                    
+                    animationId = requestAnimationFrame(animate);
+                }
+                
+                animate();
+                console.log('🎵 Simulando pezzo lungo con cambi di voce');
+            } catch (error) {
+                console.error('❌ Errore simulazione pezzo lungo:', error);
+            }
+        }
+            try {
+                stopSimulation();
+                
+                document.querySelectorAll('.demo-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                
+                isSimulating = true;
+                currentTime = 0;
+                voiceScript = null;
+                
+                // Setup single voice timeline
+                updateTimeline([{ start: 0, end: 20, voice: voiceType, description: `Voce ${voiceType}` }]);
+                
+                const canvas = document.getElementById('liveWaveform');
+                if (!canvas) return;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                
+                function animate() {
+                    if (!isSimulating) return;
+                    
+                    updateVoiceUI(voiceType, currentTime);
+                    updateTimelineProgress(currentTime);
+                    
+                    drawTemporalWaveform(ctx, canvas, voiceType, currentTime);
+                    
+                    currentTime += 0.05;
+                    if (currentTime > 20) currentTime = 0;
+                    
+                    animationId = requestAnimationFrame(animate);
+                }
+                
+                animate();
+                console.log(`🎵 Simulando voce: ${voiceType}`);
+            } catch (error) {
+                console.error('❌ Errore simulazione voce:', error);
+            }
+        }
+
+        function drawTemporalWaveform(ctx, canvas, voiceType, time) {
+            try {
+                // Clear canvas
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw grid
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 10; i++) {
+                    const y = (canvas.height / 10) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                
+                // Draw time markers
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 10; i++) {
+                    const x = (canvas.width / 10) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                    
+                    // Time labels
+                    ctx.fillStyle = '#999';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${(i * 2).toFixed(0)}s`, x, canvas.height - 5);
+                }
+                
+                // Draw center line
+                const centerY = canvas.height / 2;
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(canvas.width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw waveform with temporal color changes
+                const points = 200;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                for (let i = 0; i < points; i++) {
+                    const x = (canvas.width / points) * i;
+                    const timeAtPoint = (i / points) * 20; // 20 seconds total
+                    
+                    // Determine voice at this time point
+                    let currentVoiceAtPoint = voiceType;
+                    if (voiceScript) {
+                        const segment = voiceScript.find(s => timeAtPoint >= s.start && timeAtPoint < s.end);
+                        if (segment) currentVoiceAtPoint = segment.voice;
+                    }
+                    
+                    const progress = (timeAtPoint + time) % 2; // Wave progress
+                    const amplitude = getAmplitude(currentVoiceAtPoint);
+                    const frequency = getFrequency(currentVoiceAtPoint);
+                    
+                    let y = centerY;
+                    
+                    // Voice-specific waveform patterns
+                    if (currentVoiceAtPoint === 'aria') {
+                        y += Math.sin(progress * frequency) * amplitude * (0.7 + (timeAtPoint/20) * 0.3);
+                    } else if (currentVoiceAtPoint === 'acqua') {
+                        const pauseEffect = Math.sin(progress * 0.5) > 0.3 ? 1 : 0.1;
+                        y += Math.sin(progress * frequency) * amplitude * (1 - (timeAtPoint/20) * 0.5) * pauseEffect;
+                    } else if (currentVoiceAtPoint === 'terra') {
+                        y += Math.sin(progress * frequency) * amplitude * (0.8 - (timeAtPoint/20) * 0.3);
+                        if (timeAtPoint > 18) y = centerY; // Taglio finale
+                    } else if (currentVoiceAtPoint === 'fuoco') {
+                        y += Math.sin(progress * frequency * 2) * amplitude * (0.6 + (timeAtPoint/20) * 0.4);
+                        y += (Math.random() - 0.5) * amplitude * 0.2;
+                    }
+                    
+                    // Change stroke color based on voice
+                    if (i === 0 || (i > 0 && getCurrentVoiceColor(timeAtPoint) !== getCurrentVoiceColor(((i-1) / points) * 20))) {
+                        if (i > 0) ctx.stroke(); // Finish previous path
+                        ctx.strokeStyle = voiceColors[currentVoiceAtPoint].primary;
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                
+                // Draw current time indicator
+                const currentX = (time % 20) / 20 * canvas.width;
+                ctx.strokeStyle = '#e74c3c';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(currentX, 0);
+                ctx.lineTo(currentX, canvas.height);
+                ctx.stroke();
+                
+            } catch (error) {
+                console.error('Errore durante il disegno temporale:', error);
+            }
+        }
+
+        function getCurrentVoiceColor(timePoint) {
+            if (!voiceScript) return voiceColors.aria.primary;
+            
+            const segment = voiceScript.find(s => timePoint >= s.start && timePoint < s.end);
+            return segment ? voiceColors[segment.voice].primary : voiceColors.aria.primary;
+        }
+
+        function updateVoiceUI(voice, time, description = '') {
+            try {
+                const currentVoiceEl = document.getElementById('currentVoice');
+                const timeProgressEl = document.getElementById('timeProgress');
+                
+                if (currentVoiceEl) {
+                    const voiceIcons = { aria: '🌬️', acqua: '💧', terra: '🌍', fuoco: '🔥' };
+                    const icon = voiceIcons[voice] || '';
+                    currentVoiceEl.innerHTML = `Voce Corrente: ${icon} ${voice.toUpperCase()} ${description ? `(${description})` : ''}`;
+                    currentVoiceEl.style.color = voiceColors[voice]?.primary || '#333';
+                }
+                
+                if (timeProgressEl) {
+                    timeProgressEl.textContent = `Tempo: ${time.toFixed(1)}s`;
+                }
+            } catch (error) {
+                console.error('Errore aggiornamento UI:', error);
+            }
+        }
+
+        function updateTimeline(segments) {
+            try {
+                const timelineEl = document.getElementById('voiceTimeline');
+                if (!timelineEl) return;
+                
+                timelineEl.innerHTML = '';
+                
+                segments.forEach(segment => {
+                    const div = document.createElement('div');
+                    div.style.cssText = `
+                        position: absolute;
+                        left: ${(segment.start / 20) * 100}%;
+                        width: ${((segment.end - segment.start) / 20) * 100}%;
+                        height: 100%;
+                        background: ${voiceColors[segment.voice].primary};
+                        opacity: 0.7;
+                        border-right: 1px solid white;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 10px;
+                        color: white;
+                        font-weight: bold;
+                    `;
+                    div.textContent = segment.voice.toUpperCase();
+                    timelineEl.appendChild(div);
+                });
+                
+                timelineEl.style.position = 'relative';
+            } catch (error) {
+                console.error('Errore aggiornamento timeline:', error);
+            }
+        }
+
+        function updateTimelineProgress(currentTime) {
+            try {
+                const timelineEl = document.getElementById('voiceTimeline');
+                if (!timelineEl) return;
+                
+                // Remove existing progress indicator
+                const existingIndicator = timelineEl.querySelector('.progress-indicator');
+                if (existingIndicator) {
+                    existingIndicator.remove();
+                }
+                
+                // Add new progress indicator
+                const indicator = document.createElement('div');
+                indicator.className = 'progress-indicator';
+                indicator.style.cssText = `
+                    position: absolute;
+                    left: ${(currentTime / 20) * 100}%;
+                    width: 2px;
+                    height: 100%;
+                    background: #e74c3c;
+                    z-index: 10;
+                    box-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
+                `;
+                timelineEl.appendChild(indicator);
+            } catch (error) {
+                console.error('Errore aggiornamento progresso timeline:', error);
+            }
+        }Id;
+        let isSimulating = false;
+
+        function initLiveWaveform() {
+            try {
+                const canvas = document.getElementById('liveWaveform');
+                if (!canvas) {
+                    console.warn('Canvas liveWaveform non trovato, lo creerò...');
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.warn('Impossibile ottenere context 2d');
+                    return;
+                }
+                
+                // Set canvas size
+                canvas.width = 800;
+                canvas.height = 200;
+                
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.strokeStyle = '#dee2e6';
+                ctx.lineWidth = 1;
+                const centerY = canvas.height / 2;
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(canvas.width, centerY);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Clicca su una voce per vedere il pattern in tempo reale', canvas.width / 2, centerY + 5);
+                
+                console.log('✅ Live waveform inizializzato');
+            } catch (error) {
+                console.error('❌ Errore inizializzazione waveform:', error);
+            }
+        }
+
+        function simulateVoice(voiceType) {
+            try {
+                stopSimulation();
+                
+                const canvas = document.getElementById('liveWaveform');
+                if (!canvas) {
+                    console.error('Canvas liveWaveform non trovato per simulazione');
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.error('Impossibile ottenere context per simulazione');
+                    return;
+                }
+                
+                // Update button states
+                document.querySelectorAll('.demo-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                
+                isSimulating = true;
+                let time = 0;
+                
+                function animate() {
+                    if (!isSimulating) return;
+                    
+                    try {
+                        // Clear canvas
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        // Draw grid
+                        ctx.strokeStyle = '#f0f0f0';
+                        ctx.lineWidth = 1;
+                        for (let i = 0; i <= 10; i++) {
+                            const y = (canvas.height / 10) * i;
+                            ctx.beginPath();
+                            ctx.moveTo(0, y);
+                            ctx.lineTo(canvas.width, y);
+                            ctx.stroke();
+                        }
+                        
+                        // Draw center line
+                        const centerY = canvas.height / 2;
+                        ctx.strokeStyle = '#e0e0e0';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(0, centerY);
+                        ctx.lineTo(canvas.width, centerY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        // Draw waveform
+                        ctx.strokeStyle = voiceColors[voiceType].primary;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        
+                        const points = 200;
+                        const amplitude = getAmplitude(voiceType);
+                        const frequency = getFrequency(voiceType);
+                        
+                        for (let i = 0; i < points; i++) {
+                            const x = (canvas.width / points) * i;
+                            const progress = i / points;
+                            
+                            let y = centerY;
+                            
+                            if (voiceType === 'aria') {
+                                y += Math.sin((progress + time) * frequency) * amplitude * (0.7 + progress * 0.3);
+                            } else if (voiceType === 'acqua') {
+                                const pauseEffect = Math.sin((progress + time) * 0.5) > 0.3 ? 1 : 0.1;
+                                y += Math.sin((progress + time) * frequency) * amplitude * (1 - progress * 0.5) * pauseEffect;
+                            } else if (voiceType === 'terra') {
+                                y += Math.sin((progress + time) * frequency) * amplitude * (0.8 - progress * 0.3);
+                                if (progress > 0.9) y = centerY;
+                            } else if (voiceType === 'fuoco') {
+                                y += Math.sin((progress + time) * frequency * 2) * amplitude * (0.6 + progress * 0.4);
+                                y += (Math.random() - 0.5) * amplitude * 0.2;
+                            }
+                            
+                            if (i === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                        
+                        ctx.stroke();
+                        
+                        // Add annotations
+                        addVoiceAnnotations(ctx, voiceType, canvas.width, canvas.height, centerY);
+                        
+                        time += 0.05;
+                        animationId = requestAnimationFrame(animate);
+                    } catch (error) {
+                        console.error('Errore durante animazione:', error);
+                        stopSimulation();
+                    }
+                }
+                
+                animate();
+                console.log(`🎵 Simulando voce: ${voiceType}`);
+            } catch (error) {
+                console.error('❌ Errore simulazione voce:', error);
+            }
+        }
+
+        function addVoiceAnnotations(ctx, voiceType, width, height, centerY) {
+            try {
+                ctx.font = '12px Arial';
+                ctx.fillStyle = voiceColors[voiceType].accent;
+                ctx.textAlign = 'left';
+                
+                const annotations = {
+                    aria: [
+                        { text: '↗️ Salita graduale', x: width * 0.1, y: centerY - 40 },
+                        { text: '📈 Volume cresce', x: width * 0.6, y: centerY - 60 },
+                        { text: '🎤 Stile presentatore', x: width * 0.8, y: centerY - 30 }
+                    ],
+                    acqua: [
+                        { text: '↘️ Discesa fluida', x: width * 0.1, y: centerY - 40 },
+                        { text: '💧 Vocali allungate', x: width * 0.4, y: centerY + 50 },
+                        { text: '⏸️ Pause lunghe', x: width * 0.7, y: centerY - 20 }
+                    ],
+                    terra: [
+                        { text: '↘️ Discesa netta', x: width * 0.1, y: centerY - 40 },
+                        { text: '🥾 Ritmo marcia', x: width * 0.4, y: centerY + 40 },
+                        { text: '✂️ Taglio finale', x: width * 0.85, y: centerY + 30 }
+                    ],
+                    fuoco: [
+                        { text: '🔥 Energia esplosiva', x: width * 0.1, y: centerY - 50 },
+                        { text: '⚡ Ritmo veloce', x: width * 0.4, y: centerY - 70 },
+                        { text: '📈 Volume alto', x: width * 0.7, y: centerY + 60 }
+                    ]
+                };
+                
+                const voiceAnnotations = annotations[voiceType] || [];
+                voiceAnnotations.forEach(annotation => {
+                    ctx.fillText(annotation.text, annotation.x, annotation.y);
+                });
+            } catch (error) {
+                console.error('Errore annotazioni:', error);
+            }
+        }
+
+        function stopSimulation() {
+            isSimulating = false;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            document.querySelectorAll('.demo-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Reinitialize waveform
+            setTimeout(initLiveWaveform, 100);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔄 Inizializzazione grafici...');
+            
+            // Usa sempre i grafici SVG per semplicità e affidabilità
+            console.log('📊 Usando grafici SVG ottimizzati...');
+            createFallbackCharts();
+            initLiveWaveform();
+            
+            // Se vuoi provare Chart.js, decommmenta le righe seguenti:
+            /*
+            loadChartJS().then(() => {
+                console.log('✅ Chart.js caricato, aggiornando a grafici interattivi...');
+                initCharts();
+            }).catch(() => {
+                console.log('⚠️ Mantenendo grafici SVG...');
+            });
+            */
+        });
+
+        // Voice practice tips
+        function showPracticeTips(voiceType) {
+            const tips = {
+                aria: [
+                    "🎯 Inizia con un tono medio e sali gradualmente",
+                    "🎤 Pensa a un presentatore TV che annuncia qualcosa di importante",
+                    "📈 Aumenta leggermente il volume verso la fine",
+                    "⏱️ Mantieni un ritmo sostenuto ma non affrettato"
+                ],
+                acqua: [
+                    "🌊 Inizia con un tono più alto e lascialo scendere dolcemente",
+                    "💫 Allunga le vocali finali: 'fondoooo'",
+                    "🤫 Abbassa il volume, parla in modo intimo",
+                    "⏸️ Fai pause lunghe, quasi sospiri"
+                ],
+                terra: [
+                    "⛰️ Mantieni un tono stabile e deciso",
+                    "👏 Taglia le frasi in modo netto, senza sfumature",
+                    "🥾 Ritmo costante come una marcia",
+                    "✂️ Finale secco, senza prolungamenti"
+                ],
+                fuoco: [
+                    "🔥 Parti con energia e mantienila alta",
+                    "⚡ Ritmo veloce, incalzante",
+                    "📢 Volume alto, coinvolgente",
+                    "🚀 Pause brevissime, quasi inesistenti"
+                ]
+            };
+            
+            console.log(`💡 Consigli per la voce ${voiceType.toUpperCase()}:`);
+            tips[voiceType].forEach(tip => console.log(tip));
+        }
+
+        // Export for console use
+        window.voiceAnalysis = {
+            simulateVoice,
+            stopSimulation,
+            showPracticeTips,
+            voiceData,
+            voiceColors
+        };
+
+        console.log('🎯 Grafici Voice Break caricati! Usa voiceAnalysis.showPracticeTips("aria") per consigli pratici.');
+    </script>
+</body>
+</html>

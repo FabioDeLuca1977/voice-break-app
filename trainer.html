@@ -11,6 +11,775 @@
             box-sizing: border-box;
         }
 
+        // Classe principale VoiceBreakTrainer
+        class VoiceBreakTrainer {
+            constructor() {
+                this.selectedVoice = null;
+                this.isRecording = false;
+                this.isAiRecording = false;
+                this.validationQueue = [];
+                this.lastRecording = null;
+                this.recordingData = [];
+                
+                this.stats = {
+                    overallAccuracy: 94,
+                    validatedSamples: 847,
+                    correctPredictions: 798,
+                    needsCorrection: 49,
+                    voiceAccuracy: {
+                        aria: 96,
+                        acqua: 93,
+                        terra: 91,
+                        fuoco: 97
+                    }
+                };
+
+                this.voicePatterns = {
+                    aria: {
+                        description: "Salite graduali e aperture, come una brezza che sale",
+                        pattern: "ascending",
+                        characteristics: ["Tono ascendente", "Aperture graduate", "Energia crescente"]
+                    },
+                    acqua: {
+                        description: "Discese fluide con puntini finali (fondoooo)",
+                        pattern: "descending_with_trails",
+                        characteristics: ["Tono discendente", "Pause fluide", "Finali prolungate"]
+                    },
+                    terra: {
+                        description: "Discese nette senza puntini, chiusure secche (fondo)",
+                        pattern: "descending_clean",
+                        characteristics: ["Tono fermo", "Chiusure nette", "Finali secche"]
+                    },
+                    fuoco: {
+                        description: "Energia alta, ritmo incalzante, spinta all'azione",
+                        pattern: "energetic",
+                        characteristics: ["Energia alta", "Ritmo veloce", "Tono incisivo"]
+                    }
+                };
+                
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.generateValidationQueue();
+                this.updateStats();
+                
+                this.enhancedAnalysis = new EnhancedVoiceAnalysis();
+                this.comparison = new WaveformComparison(this);
+                this.comparison.createComparisonPanel();
+                
+                console.log('Voice Break Trainer initialized with enhanced analysis');
+            }
+
+            setupEventListeners() {
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        this.selectVoice(option.dataset.voice);
+                    });
+                });
+
+                document.getElementById('recordButton').addEventListener('click', () => {
+                    this.toggleRecording();
+                });
+
+                document.getElementById('aiRecordButton').addEventListener('click', () => {
+                    this.toggleAiRecording();
+                });
+            }
+
+            selectVoice(voiceType) {
+                document.querySelectorAll('.voice-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                document.querySelector(`[data-voice="${voiceType}"]`).classList.add('selected');
+                this.selectedVoice = voiceType;
+                
+                const tip = `Test registrazione per la voce ${this.voicePatterns[voiceType].description}`;
+                document.getElementById('recordingTip').textContent = tip;
+                
+                console.log(`Selected voice: ${voiceType}`);
+            }
+
+            toggleRecording() {
+                if (!this.selectedVoice) {
+                    this.showNotification('Seleziona prima una voce da testare', 'warning');
+                    return;
+                }
+
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            }
+
+            toggleAiRecording() {
+                if (this.isAiRecording) {
+                    this.stopAiRecording();
+                } else {
+                    this.startAiRecording();
+                }
+            }
+
+            startRecording() {
+                this.isRecording = true;
+                const recordButton = document.getElementById('recordButton');
+                recordButton.classList.add('recording');
+                recordButton.textContent = '⏹️';
+                
+                this.startTimer('recordingTimer');
+                console.log('Recording started for voice:', this.selectedVoice);
+            }
+
+            stopRecording() {
+                this.isRecording = false;
+                const recordButton = document.getElementById('recordButton');
+                recordButton.classList.remove('recording');
+                recordButton.textContent = '🎤';
+                
+                this.stopTimer('recordingTimer');
+                
+                setTimeout(() => {
+                    this.analyzeRecording();
+                }, 1000);
+
+                console.log('Recording stopped');
+            }
+
+            startAiRecording() {
+                this.isAiRecording = true;
+                const aiRecordButton = document.getElementById('aiRecordButton');
+                aiRecordButton.classList.add('recording');
+                aiRecordButton.textContent = '⏹️';
+                
+                this.startTimer('aiRecordingTimer');
+                this.recordingData = [];
+                
+                this.recordingInterval = setInterval(() => {
+                    const progress = this.recordingData.length / 200;
+                    
+                    const targetVoice = ['aria', 'acqua', 'terra', 'fuoco'][Math.floor(Math.random() * 4)];
+                    let baseVolume, volumeModifier;
+                    
+                    switch(targetVoice) {
+                        case 'aria':
+                            baseVolume = 0.6 + progress * 0.2;
+                            volumeModifier = 1 + Math.sin(progress * Math.PI * 2) * 0.3;
+                            break;
+                        case 'acqua':
+                            baseVolume = 0.4 - progress * 0.2;
+                            volumeModifier = 1 + Math.sin(progress * Math.PI * 6) * 0.1;
+                            break;
+                        case 'terra':
+                            baseVolume = 0.5;
+                            volumeModifier = 1 + Math.sin(progress * Math.PI * 4) * 0.15;
+                            break;
+                        case 'fuoco':
+                            baseVolume = 0.7;
+                            if (progress > 0.7) baseVolume += 0.2;
+                            volumeModifier = 1 + Math.sin(progress * Math.PI * 8) * 0.4;
+                            break;
+                    }
+                    
+                    const amplitude = (Math.random() - 0.5) * 2 * baseVolume * volumeModifier;
+                    
+                    this.recordingData.push({
+                        timestamp: Date.now(),
+                        amplitude: Math.max(-1, Math.min(1, amplitude)),
+                        frequency: 150 + Math.random() * 300 + (progress * 100)
+                    });
+                }, 50);
+                
+                console.log('🎤 AI Recording started with enhanced volume simulation');
+            }
+
+            stopAiRecording() {
+                this.isAiRecording = false;
+                const aiRecordButton = document.getElementById('aiRecordButton');
+                aiRecordButton.classList.remove('recording');
+                aiRecordButton.textContent = '🎤';
+                
+                this.stopTimer('aiRecordingTimer');
+                clearInterval(this.recordingInterval);
+                
+                this.showNotification('Analizzando la registrazione con AI avanzata...', 'info');
+                
+                setTimeout(() => {
+                    this.performAiAnalysis();
+                    this.drawRecordedWaveform();
+                }, 2000);
+
+                console.log('AI Recording stopped, data points:', this.recordingData.length);
+            }
+
+            startTimer(timerId) {
+                let seconds = 0;
+                this[timerId + 'Interval'] = setInterval(() => {
+                    seconds++;
+                    const minutes = Math.floor(seconds / 60);
+                    const secs = seconds % 60;
+                    document.getElementById(timerId).textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }, 1000);
+            }
+
+            stopTimer(timerId) {
+                clearInterval(this[timerId + 'Interval']);
+                document.getElementById(timerId).textContent = '00:00';
+            }
+
+            performAiAnalysis() {
+                const result = this.enhancedAnalysis.analyzeRecordingWithVolume(this.recordingData);
+                
+                console.log('🔍 ANALISI AI COMPLETA:');
+                console.log('📊 Volume medio:', (result.analysis.volume.average * 100).toFixed(1) + '%');
+                console.log('📈 Pattern volume:', result.analysis.volume.pattern);
+                console.log('🎯 Volume finale:', (result.analysis.volume.final * 100).toFixed(1) + '%');
+                console.log('🎵 Pattern pitch:', result.analysis.pitch.pattern);
+                console.log('👑 Voce dominante:', result.dominantVoice.toUpperCase());
+                console.log('🎯 Confidenza:', (result.confidence * 100).toFixed(1) + '%');
+                console.log('📊 Percentuali finali:', result.percentages);
+                
+                this.displayVoiceAnalysis(result.percentages);
+                this.comparison.setDominantVoice(result.percentages);
+                this.showVolumeAnalysisDetails(result.analysis);
+                
+                const volumeClass = result.analysis.volume.classification;
+                const pattern = result.analysis.volume.pattern;
+                const dominantVoice = result.dominantVoice.toUpperCase();
+                
+                this.showNotification(
+                    `${dominantVoice}: Volume ${volumeClass}, Pattern ${pattern}`,
+                    'success'
+                );
+            }
+
+            showVolumeAnalysisDetails(analysis) {
+                const volumePercent = (analysis.volume.average * 100).toFixed(0);
+                const finalPercent = (analysis.volume.final * 100).toFixed(0);
+                const volumeChange = analysis.volume.change > 0 ? 'crescendo' : 
+                                    analysis.volume.change < -0.1 ? 'decrescendo' : 'stabile';
+                
+                console.log('📋 DETTAGLI VOLUME ANALISI:', {
+                    volumePercent,
+                    finalPercent,
+                    volumeChange,
+                    pattern: analysis.volume.pattern,
+                    classification: analysis.volume.classification
+                });
+                
+                setTimeout(() => {
+                    const message = `Vol: ${volumePercent}% → ${finalPercent}% (${analysis.volume.pattern})`;
+                    this.showNotification(message, 'info');
+                }, 1500);
+            }
+
+            displayVoiceAnalysis(percentages) {
+                document.getElementById('voiceAnalysis').style.display = 'block';
+                
+                const highest = Object.entries(percentages).reduce((a, b) => 
+                    percentages[a[0]] > percentages[b[0]] ? a : b
+                )[0];
+
+                Object.entries(percentages).forEach(([voice, percentage]) => {
+                    const fillElement = document.getElementById(`${voice}Fill`);
+                    const valueElement = document.getElementById(`${voice}Value`);
+                    const containerElement = document.getElementById(`${voice}Percentage`);
+                    
+                    setTimeout(() => {
+                        fillElement.style.width = percentage + '%';
+                        fillElement.textContent = percentage + '%';
+                        valueElement.textContent = percentage + '%';
+                        
+                        if (voice === highest) {
+                            containerElement.classList.add('highest');
+                        } else {
+                            containerElement.classList.remove('highest');
+                        }
+                    }, 300);
+                });
+
+                const highestVoice = highest.charAt(0).toUpperCase() + highest.slice(1);
+                setTimeout(() => {
+                    this.showNotification(`Voce dominante: ${highestVoice} (${percentages[highest]}%)`, 'success');
+                }, 1000);
+            }
+
+            drawRecordedWaveform() {
+                const canvas = document.getElementById('recordedCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                
+                const width = canvas.width;
+                const height = canvas.height;
+                const centerY = height / 2;
+                const margin = 20;
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 8; i++) {
+                    const y = (height / 8) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+                
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                if (this.recordingData.length > 0) {
+                    ctx.strokeStyle = '#3498db';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    const step = (width - margin * 2) / this.recordingData.length;
+                    
+                    this.recordingData.forEach((point, index) => {
+                        const x = margin + index * step;
+                        const y = centerY + point.amplitude * (height / 4);
+                        
+                        if (index === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    });
+                    
+                    ctx.stroke();
+                    
+                    const duration = (this.recordingData.length * 50) / 1000;
+                    document.getElementById('recordedDescription').textContent = 
+                        `Registrazione: ${duration.toFixed(1)}s, ${this.recordingData.length} campioni`;
+                } else {
+                    document.getElementById('recordedDescription').textContent = 
+                        'Nessuna registrazione disponibile';
+                }
+            }
+
+            analyzeRecording() {
+                const confidence = 0.7 + Math.random() * 0.25;
+                const isCorrect = Math.random() > 0.3;
+                const predictedVoice = isCorrect ? this.selectedVoice : this.getRandomVoice();
+                
+                const validationItem = {
+                    id: Date.now(),
+                    actualVoice: this.selectedVoice,
+                    predictedVoice: predictedVoice,
+                    confidence: confidence,
+                    timestamp: new Date(),
+                    validated: false
+                };
+                
+                this.validationQueue.unshift(validationItem);
+                this.refreshValidationQueue();
+                
+                this.showNotification(`Analisi completata: ${predictedVoice.toUpperCase()} (${Math.round(confidence * 100)}%)`, 'success');
+            }
+
+            getRandomVoice() {
+                const voices = ['aria', 'acqua', 'terra', 'fuoco'];
+                const filtered = voices.filter(v => v !== this.selectedVoice);
+                return filtered[Math.floor(Math.random() * filtered.length)];
+            }
+
+            generateValidationQueue() {
+                const sampleItems = [
+                    { actualVoice: 'aria', predictedVoice: 'terra', confidence: 0.78 },
+                    { actualVoice: 'acqua', predictedVoice: 'acqua', confidence: 0.92 },
+                    { actualVoice: 'terra', predictedVoice: 'fuoco', confidence: 0.65 },
+                    { actualVoice: 'fuoco', predictedVoice: 'fuoco', confidence: 0.89 },
+                    { actualVoice: 'aria', predictedVoice: 'aria', confidence: 0.95 }
+                ];
+
+                this.validationQueue = sampleItems.map((item, index) => ({
+                    id: Date.now() + index,
+                    ...item,
+                    timestamp: new Date(Date.now() - Math.random() * 3600000),
+                    validated: false
+                }));
+
+                this.refreshValidationQueue();
+            }
+
+            refreshValidationQueue() {
+                const container = document.getElementById('validationQueue');
+                container.innerHTML = '';
+
+                if (this.validationQueue.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <div style="font-size: 3em; margin-bottom: 15px;">✅</div>
+                            <p>Tutte le predizioni sono state validate!</p>
+                            <p style="font-size: 0.9em; margin-top: 5px;">Registra nuovi test per continuare il training</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                this.validationQueue.slice(0, 5).forEach(item => {
+                    const validationItem = this.createValidationItem(item);
+                    container.appendChild(validationItem);
+                });
+            }
+
+            createValidationItem(item) {
+                const div = document.createElement('div');
+                div.className = 'validation-item';
+                div.dataset.id = item.id;
+
+                const voiceIcons = {
+                    aria: '🌬️',
+                    acqua: '💧',
+                    terra: '🌍',
+                    fuoco: '🔥'
+                };
+
+                const isCorrect = item.actualVoice === item.predictedVoice;
+                const confidencePercent = Math.round(item.confidence * 100);
+
+                div.innerHTML = `
+                    <div class="prediction-row">
+                        <div class="prediction-info">
+                            <div class="predicted-voice">
+                                ${voiceIcons[item.predictedVoice]} Predizione: <strong>${item.predictedVoice.toUpperCase()}</strong>
+                                ${isCorrect ? '✅' : '❌'}
+                            </div>
+                            <div class="confidence">
+                                Affidabilità: ${confidencePercent}% • Registrato: ${item.timestamp.toLocaleTimeString('it-IT')}
+                            </div>
+                        </div>
+                        <div class="correction-buttons">
+                            <button class="correction-btn correct" onclick="validatePrediction('${item.id}', true)">
+                                ✅ Corretto
+                            </button>
+                            <button class="correction-btn wrong" onclick="validatePrediction('${item.id}', false)">
+                                ❌ Sbagliato
+                            </button>
+                        </div>
+                    </div>
+                    <div class="voice-correction" id="correction-${item.id}">
+                        <div class="voice-correct-btn" data-voice="aria" onclick="correctVoice('${item.id}', 'aria')">
+                            ${voiceIcons.aria} Aria
+                        </div>
+                        <div class="voice-correct-btn" data-voice="acqua" onclick="correctVoice('${item.id}', 'acqua')">
+                            ${voiceIcons.acqua} Acqua
+                        </div>
+                        <div class="voice-correct-btn" data-voice="terra" onclick="correctVoice('${item.id}', 'terra')">
+                            ${voiceIcons.terra} Terra
+                        </div>
+                        <div class="voice-correct-btn" data-voice="fuoco" onclick="correctVoice('${item.id}', 'fuoco')">
+                            ${voiceIcons.fuoco} Fuoco
+                        </div>
+                    </div>
+                `;
+
+                return div;
+            }
+
+            validatePrediction(itemId, isCorrect) {
+                const item = this.validationQueue.find(i => i.id == itemId);
+                if (!item) return;
+
+                if (isCorrect) {
+                    this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
+                    this.stats.correctPredictions++;
+                    this.showNotification('Predizione confermata come corretta', 'success');
+                } else {
+                    const correctionDiv = document.getElementById(`correction-${itemId}`);
+                    correctionDiv.classList.add('show');
+                }
+
+                this.stats.validatedSamples++;
+                this.updateStats();
+                this.refreshValidationQueue();
+            }
+
+            correctVoice(itemId, correctVoice) {
+                const item = this.validationQueue.find(i => i.id == itemId);
+                if (!item) return;
+
+                item.actualVoice = correctVoice;
+                item.validated = true;
+
+                this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
+                
+                this.stats.needsCorrection--;
+                this.stats.validatedSamples++;
+                
+                this.recalculateAccuracy();
+                this.updateStats();
+                this.refreshValidationQueue();
+
+                this.showNotification(`Correzione salvata: ${correctVoice.toUpperCase()}`, 'success');
+            }
+
+            recalculateAccuracy() {
+                Object.keys(this.stats.voiceAccuracy).forEach(voice => {
+                    const variation = (Math.random() - 0.5) * 4;
+                    this.stats.voiceAccuracy[voice] = Math.max(85, Math.min(99, 
+                        this.stats.voiceAccuracy[voice] + variation
+                    ));
+                });
+
+                const avgAccuracy = Object.values(this.stats.voiceAccuracy)
+                    .reduce((a, b) => a + b, 0) / 4;
+                this.stats.overallAccuracy = Math.round(avgAccuracy);
+            }
+
+            updateStats() {
+                document.getElementById('overallAccuracy').textContent = this.stats.overallAccuracy + '%';
+                document.getElementById('validatedSamples').textContent = this.stats.validatedSamples;
+                document.getElementById('correctPredictions').textContent = this.stats.correctPredictions;
+                document.getElementById('needsCorrection').textContent = this.stats.needsCorrection;
+
+                Object.keys(this.stats.voiceAccuracy).forEach(voice => {
+                    const accuracy = Math.round(this.stats.voiceAccuracy[voice]);
+                    document.getElementById(`${voice}Accuracy`).textContent = accuracy + '%';
+                    
+                    const bar = document.querySelector(`#${voice}Accuracy`).parentElement.nextElementSibling.querySelector('.accuracy-fill');
+                    if (bar) {
+                        bar.style.width = accuracy + '%';
+                    }
+                });
+            }
+
+            showWaveform(voiceType) {
+                const canvas = document.getElementById('waveformCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                
+                const width = canvas.width;
+                const height = canvas.height;
+                const centerY = height / 2;
+                const margin = 40;
+                const maxAmplitude = (height / 2) - margin;
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                
+                ctx.strokeStyle = '#f0f0f0';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 10; i++) {
+                    const y = (height / 10) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+                
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(width, centerY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                const points = 200;
+                const leftMargin = 20;
+                const rightMargin = 20;
+                const drawWidth = width - leftMargin - rightMargin;
+                
+                for (let i = 0; i < points; i++) {
+                    const x = leftMargin + (drawWidth / points) * i;
+                    const progress = i / points;
+                    let amplitude = 0;
+                    
+                    switch(voiceType) {
+                        case 'aria':
+                            amplitude = Math.sin(progress * Math.PI * 4) * 0.6 - (progress * 0.8);
+                            if (progress > 0.7) {
+                                amplitude += Math.sin(progress * Math.PI * 12) * 0.3;
+                            }
+                            amplitude = Math.max(-0.9, Math.min(0.3, amplitude));
+                            break;
+                            
+                        case 'acqua':
+                            amplitude = -Math.sin(progress * Math.PI * 2) * 0.4 + (progress * 0.7);
+                            if (progress > 0.8) {
+                                amplitude += Math.sin(progress * Math.PI * 20) * 0.2;
+                            }
+                            amplitude = Math.max(-0.3, Math.min(0.9, amplitude));
+                            break;
+                            
+                        case 'terra':
+                            amplitude = Math.sin(progress * Math.PI * 3) * 0.5 + (progress * 0.6);
+                            if (progress > 0.9) {
+                                amplitude = 0.8;
+                            }
+                            amplitude = Math.max(-0.2, Math.min(0.8, amplitude));
+                            break;
+                            
+                        case 'fuoco':
+                            amplitude = Math.sin(progress * Math.PI * 8) * 0.7;
+                            amplitude += Math.sin(progress * Math.PI * 16) * 0.3;
+                            amplitude = Math.max(-0.8, Math.min(0.8, amplitude));
+                            break;
+                    }
+                    
+                    const y = centerY + (amplitude * maxAmplitude);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+                
+                this.addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude);
+                
+                const description = this.voicePatterns[voiceType].description;
+                document.getElementById('waveformDescription').textContent = description;
+            }
+
+            addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude) {
+                ctx.font = '11px Arial';
+                ctx.fillStyle = '#e67e22';
+                ctx.textAlign = 'center';
+                
+                const safeTopY = centerY - maxAmplitude + 15;
+                const safeBottomY = centerY + maxAmplitude - 5;
+                
+                switch(voiceType) {
+                    case 'aria':
+                        ctx.fillText('↗️ Salite', width * 0.25, safeTopY);
+                        ctx.fillText('↗️ Aperture', width * 0.5, safeTopY - 10);
+                        ctx.fillText('↗️ Crescendo', width * 0.8, safeTopY);
+                        break;
+                        
+                    case 'acqua':
+                        ctx.fillText('↘️ Discesa fluida', width * 0.35, safeTopY);
+                        ctx.fillText('~~~~ Puntini finali', width * 0.8, safeBottomY);
+                        break;
+                        
+                    case 'terra':
+                        ctx.fillText('↘️ Discesa strutturata', width * 0.4, safeTopY);
+                        ctx.fillText('✂️ Taglio netto', width * 0.85, safeBottomY);
+                        break;
+                        
+                    case 'fuoco':
+                        ctx.fillText('⚡ Alta energia', width * 0.25, safeTopY);
+                        ctx.fillText('🔥 Ritmo incalzante', width * 0.75, safeTopY);
+                        break;
+                }
+                
+                ctx.textAlign = 'start';
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => document.body.removeChild(notification), 300);
+                }, 4000);
+            }
+        }
+
+        // Global functions
+        function validatePrediction(itemId, isCorrect) {
+            app.validatePrediction(itemId, isCorrect);
+        }
+
+        function correctVoice(itemId, voice) {
+            app.correctVoice(itemId, voice);
+        }
+
+        function showWaveform(voiceType) {
+            app.showWaveform(voiceType);
+        }
+
+        function generateNewSamples() {
+            app.generateValidationQueue();
+            app.showNotification('Nuovi campioni generati per la validazione', 'info');
+        }
+
+        function playRecorded() {
+            app.showNotification('Riproduzione simulata della registrazione', 'info');
+        }
+
+        function analyzeRecorded() {
+            if (app.recordingData.length > 0) {
+                app.showNotification('Rianalizzando la registrazione...', 'info');
+                setTimeout(() => {
+                    app.performAiAnalysis();
+                }, 1500);
+            } else {
+                app.showNotification('Nessuna registrazione da analizzare', 'warning');
+            }
+        }
+
+        function saveRecording() {
+            if (app.recordingData.length > 0) {
+                app.showNotification('Registrazione salvata nel database di training', 'success');
+            } else {
+                app.showNotification('Nessuna registrazione da salvare', 'warning');
+            }
+        }
+
+        // Global variables
+        let app;
+        let comparison;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new VoiceBreakTrainer();
+            comparison = app.comparison;
+            
+            setTimeout(() => {
+                app.showWaveform('aria');
+            }, 500);
+        });
+    </script>
+</body>
+</html>Trainer {
+            constructor() {
+                this.selectedVoice = null;
+                this.isRecording = false;
+                this.isAiRecording = false;
+                this.validationQueue = [];
+                this.lastRecording = null;
+                this.recordingData = [];
+                
+                this.stats = {
+                    overallAccuracy: 94,
+                    validatedSamples: 847,
+                    correctPredictions: 798,
+                    needsCorrection: 49,
+                    voiceAccuracy: {
+                        aria: 96,
+                        acqua: 93,
+                        terra:
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
@@ -55,7 +824,7 @@
 
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 30px;
             margin-bottom: 30px;
         }
@@ -82,7 +851,20 @@
         }
 
         .half-width {
-            grid-column: span 2;
+            grid-column: span 1;
+        }
+
+        /* Force proper layout for three-column sections */
+        .three-column-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+        }
+
+        @media (max-width: 1200px) {
+            .three-column-section {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Test Recording Section */
@@ -96,9 +878,15 @@
 
         .voice-selector {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             margin-bottom: 20px;
+        }
+
+        @media (min-width: 500px) {
+            .voice-selector {
+                grid-template-columns: repeat(4, 1fr);
+            }
         }
 
         .voice-option {
@@ -331,6 +1119,24 @@
             background: white;
         }
 
+        /* Comparison Panel */
+        .comparison-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .comparison-legend {
+            display: flex;
+            gap: 20px;
+        }
+
+        .analysis-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
         /* Stats */
         .stats-grid {
             display: grid;
@@ -533,6 +1339,10 @@
             border-left: 4px solid #f39c12;
         }
 
+        .notification.info {
+            border-left: 4px solid #3498db;
+        }
+
         .analyzing {
             animation: analyzing 2s infinite;
         }
@@ -546,11 +1356,12 @@
 <body>
     <div class="header">
         <h1>🎓 Pannello Trainer Avanzato - Analisi AI Real-time</h1>
-        <a href="index.html" class="back-btn">← Home</a>
+        <a href="#" class="back-btn">← Home</a>
     </div>
 
     <div class="container">
-        <div class="dashboard-grid">
+        <!-- Top Row: Three main panels -->
+        <div class="three-column-section">
             <!-- Test Recording with Voice Selection -->
             <div class="panel">
                 <h2 class="panel-title">🎤 Test Mirato</h2>
@@ -708,9 +1519,12 @@
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- Middle Row: Waveform panels -->
+        <div class="dashboard-grid">
             <!-- Recorded Voice Waveform -->
-            <div class="panel half-width">
+            <div class="panel">
                 <h2 class="panel-title">📈 Forma d'Onda Registrata</h2>
                 
                 <div class="recorded-waveform">
@@ -728,7 +1542,7 @@
             </div>
 
             <!-- Reference Waveforms -->
-            <div class="panel half-width">
+            <div class="panel">
                 <h2 class="panel-title">📊 Pattern di Riferimento</h2>
                 
                 <div class="waveform-container">
@@ -745,531 +1559,473 @@
                     </p>
                 </div>
             </div>
+        </div>
 
-            <!-- Validation Queue -->
-            <div class="panel full-width">
-                <h2 class="panel-title">✅ Coda di Validazione</h2>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <p style="color: #666;">Correggi le predizioni del modello per migliorare l'accuratezza</p>
-                    <button class="waveform-btn" onclick="generateNewSamples()">🔄 Genera Nuovi Campioni</button>
-                </div>
+        <!-- Bottom Row: Validation Queue -->
+        <div class="panel full-width">
+            <h2 class="panel-title">✅ Coda di Validazione</h2>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <p style="color: #666;">Correggi le predizioni del modello per migliorare l'accuratezza</p>
+                <button class="waveform-btn" onclick="generateNewSamples()">🔄 Genera Nuovi Campioni</button>
+            </div>
 
-                <div id="validationQueue">
-                    <!-- Validation items will be populated by JavaScript -->
-                </div>
+            <div id="validationQueue">
+                <!-- Validation items will be populated by JavaScript -->
             </div>
         </div>
     </div>
 
     <script>
-        class VoiceBreakTrainer {
+        // Sistema di Analisi AI Avanzato con Volume
+        class EnhancedVoiceAnalysis {
             constructor() {
-                this.selectedVoice = null;
-                this.isRecording = false;
-                this.isAiRecording = false;
-                this.validationQueue = [];
-                this.lastRecording = null;
-                this.recordingData = [];
-                
-                this.stats = {
-                    overallAccuracy: 94,
-                    validatedSamples: 847,
-                    correctPredictions: 798,
-                    needsCorrection: 49,
-                    voiceAccuracy: {
-                        aria: 96,
-                        acqua: 93,
-                        terra: 91,
-                        fuoco: 97
-                    }
-                };
-
-                this.voicePatterns = {
+                // Profili volume per ogni voce
+                this.volumeProfiles = {
                     aria: {
-                        description: "Salite graduali e aperture, come una brezza che sale",
-                        pattern: "ascending",
-                        characteristics: ["Tono ascendente", "Aperture graduate", "Energia crescente"]
+                        baseVolume: 0.7,        
+                        volumePattern: 'crescendo',
+                        finalVolume: 0.8,       
+                        characteristics: ['volume medio-alto', 'crescendo graduale', 'apertura energica']
                     },
                     acqua: {
-                        description: "Discese fluide con puntini finali (fondoooo)",
-                        pattern: "descending_with_trails",
-                        characteristics: ["Tono discendente", "Pause fluide", "Finali prolungate"]
+                        baseVolume: 0.3,        
+                        volumePattern: 'decrescendo',
+                        finalVolume: 0.2,       
+                        characteristics: ['volume basso', 'decrescendo fluido', 'finali sussurrati']
                     },
                     terra: {
-                        description: "Discese nette senza puntini, chiusure secche (fondo)",
-                        pattern: "descending_clean",
-                        characteristics: ["Tono fermo", "Chiusure nette", "Finali secche"]
+                        baseVolume: 0.5,        
+                        volumePattern: 'stable',
+                        finalVolume: 0.6,       
+                        characteristics: ['volume medio', 'stabilità costante', 'finale netto']
                     },
                     fuoco: {
-                        description: "Energia alta, ritmo incalzante, spinta all'azione",
-                        pattern: "energetic",
-                        characteristics: ["Energia alta", "Ritmo veloce", "Tono incisivo"]
+                        baseVolume: 0.6,        
+                        volumePattern: 'explosive',
+                        finalVolume: 0.9,       
+                        characteristics: ['volume alto', 'energia esplosiva', 'finale potente']
                     }
                 };
-                
-                this.init();
+
+                this.volumeThresholds = {
+                    low: 0.35,
+                    medium: 0.65,
+                    high: 0.85
+                };
             }
 
-            init() {
-                this.setupEventListeners();
-                this.generateValidationQueue();
-                this.updateStats();
-                console.log('Voice Break Trainer initialized');
-            }
-
-            setupEventListeners() {
-                // Voice selection
-                document.querySelectorAll('.voice-option').forEach(option => {
-                    option.addEventListener('click', (e) => {
-                        this.selectVoice(option.dataset.voice);
-                    });
-                });
-
-                // Recording buttons
-                document.getElementById('recordButton').addEventListener('click', () => {
-                    this.toggleRecording();
-                });
-
-                document.getElementById('aiRecordButton').addEventListener('click', () => {
-                    this.toggleAiRecording();
-                });
-            }
-
-            selectVoice(voiceType) {
-                document.querySelectorAll('.voice-option').forEach(option => {
-                    option.classList.remove('selected');
-                });
-                
-                document.querySelector(`[data-voice="${voiceType}"]`).classList.add('selected');
-                this.selectedVoice = voiceType;
-                
-                const tip = `Test registrazione per la voce ${this.voicePatterns[voiceType].description}`;
-                document.getElementById('recordingTip').textContent = tip;
-                
-                console.log(`Selected voice: ${voiceType}`);
-            }
-
-            toggleRecording() {
-                if (!this.selectedVoice) {
-                    this.showNotification('Seleziona prima una voce da testare', 'warning');
-                    return;
+            analyzeRecordingWithVolume(recordingData) {
+                if (!recordingData || recordingData.length === 0) {
+                    return this.generateFallbackAnalysis();
                 }
 
-                if (this.isRecording) {
-                    this.stopRecording();
-                } else {
-                    this.startRecording();
+                const analysis = {
+                    volume: this.analyzeVolumePattern(recordingData),
+                    pitch: this.analyzePitchPattern(recordingData),
+                    energy: this.analyzeEnergyPattern(recordingData),
+                    timing: this.analyzeTimingPattern(recordingData)
+                };
+
+                const voiceScores = this.calculateVoiceScores(analysis);
+                const percentages = this.normalizeToPercentages(voiceScores);
+
+                return {
+                    percentages,
+                    analysis,
+                    dominantVoice: this.getDominantVoice(percentages),
+                    confidence: this.calculateConfidence(voiceScores)
+                };
+            }
+
+            analyzeVolumePattern(data) {
+                const volumes = data.map(point => Math.abs(point.amplitude));
+                const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+                
+                const segments = 4;
+                const segmentSize = Math.floor(data.length / segments);
+                const segmentVolumes = [];
+                
+                for (let i = 0; i < segments; i++) {
+                    const start = i * segmentSize;
+                    const end = Math.min(start + segmentSize, data.length);
+                    const segmentData = volumes.slice(start, end);
+                    const segmentAvg = segmentData.reduce((a, b) => a + b, 0) / segmentData.length;
+                    segmentVolumes.push(segmentAvg);
                 }
+
+                const initialVolume = segmentVolumes[0];
+                const finalVolume = segmentVolumes[segments - 1];
+                const volumeChange = finalVolume - initialVolume;
+                
+                let pattern = 'stable';
+                if (volumeChange > 0.15) pattern = 'crescendo';
+                else if (volumeChange < -0.15) pattern = 'decrescendo';
+                else if (finalVolume > 0.7) pattern = 'explosive';
+
+                return {
+                    average: avgVolume,
+                    initial: initialVolume,
+                    final: finalVolume,
+                    change: volumeChange,
+                    pattern: pattern,
+                    segments: segmentVolumes,
+                    classification: this.classifyVolume(avgVolume)
+                };
             }
 
-            toggleAiRecording() {
-                if (this.isAiRecording) {
-                    this.stopAiRecording();
-                } else {
-                    this.startAiRecording();
+            analyzePitchPattern(data) {
+                const frequencies = data.map(point => point.frequency || 200 + Math.random() * 300);
+                const avgFreq = frequencies.reduce((a, b) => a + b, 0) / frequencies.length;
+                
+                const initialFreq = frequencies.slice(0, 10).reduce((a, b) => a + b, 0) / 10;
+                const finalFreq = frequencies.slice(-10).reduce((a, b) => a + b, 0) / 10;
+                const pitchChange = finalFreq - initialFreq;
+                
+                let pattern = 'stable';
+                if (pitchChange > 50) pattern = 'ascending';
+                else if (pitchChange < -50) pattern = 'descending';
+                
+                return {
+                    average: avgFreq,
+                    change: pitchChange,
+                    pattern: pattern,
+                    range: Math.max(...frequencies) - Math.min(...frequencies)
+                };
+            }
+
+            analyzeEnergyPattern(data) {
+                const energies = [];
+                for (let i = 1; i < data.length; i++) {
+                    const energyChange = Math.abs(data[i].amplitude - data[i-1].amplitude);
+                    energies.push(energyChange);
                 }
+                
+                const avgEnergy = energies.reduce((a, b) => a + b, 0) / energies.length;
+                const maxEnergy = Math.max(...energies);
+                
+                return {
+                    average: avgEnergy,
+                    maximum: maxEnergy,
+                    variability: this.calculateVariability(energies)
+                };
             }
 
-            startRecording() {
-                this.isRecording = true;
-                const recordButton = document.getElementById('recordButton');
-                recordButton.classList.add('recording');
-                recordButton.textContent = '⏹️';
+            analyzeTimingPattern(data) {
+                const lowAmplitudeThreshold = 0.1;
+                const pauses = [];
+                let currentPause = 0;
                 
-                this.startTimer('recordingTimer');
-                console.log('Recording started for voice:', this.selectedVoice);
-            }
-
-            stopRecording() {
-                this.isRecording = false;
-                const recordButton = document.getElementById('recordButton');
-                recordButton.classList.remove('recording');
-                recordButton.textContent = '🎤';
-                
-                this.stopTimer('recordingTimer');
-                
-                // Simulate analysis
-                setTimeout(() => {
-                    this.analyzeRecording();
-                }, 1000);
-
-                console.log('Recording stopped');
-            }
-
-            startAiRecording() {
-                this.isAiRecording = true;
-                const aiRecordButton = document.getElementById('aiRecordButton');
-                aiRecordButton.classList.add('recording');
-                aiRecordButton.textContent = '⏹️';
-                
-                this.startTimer('aiRecordingTimer');
-                this.recordingData = []; // Reset recording data
-                
-                // Simulate real-time recording data collection
-                this.recordingInterval = setInterval(() => {
-                    this.recordingData.push({
-                        timestamp: Date.now(),
-                        amplitude: (Math.random() - 0.5) * 2,
-                        frequency: Math.random() * 1000 + 100
-                    });
-                }, 50);
-                
-                console.log('AI Recording started');
-            }
-
-            stopAiRecording() {
-                this.isAiRecording = false;
-                const aiRecordButton = document.getElementById('aiRecordButton');
-                aiRecordButton.classList.remove('recording');
-                aiRecordButton.textContent = '🎤';
-                
-                this.stopTimer('aiRecordingTimer');
-                clearInterval(this.recordingInterval);
-                
-                this.showNotification('Analizzando la registrazione...', 'info');
-                
-                // Simulate AI analysis
-                setTimeout(() => {
-                    this.performAiAnalysis();
-                    this.drawRecordedWaveform();
-                }, 2000);
-
-                console.log('AI Recording stopped, data points:', this.recordingData.length);
-            }
-
-            startTimer(timerId) {
-                let seconds = 0;
-                this[timerId + 'Interval'] = setInterval(() => {
-                    seconds++;
-                    const minutes = Math.floor(seconds / 60);
-                    const secs = seconds % 60;
-                    document.getElementById(timerId).textContent = 
-                        `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                }, 1000);
-            }
-
-            stopTimer(timerId) {
-                clearInterval(this[timerId + 'Interval']);
-                document.getElementById(timerId).textContent = '00:00';
-            }
-
-            performAiAnalysis() {
-                // Simulate AI analysis with realistic percentages
-                const voices = ['aria', 'acqua', 'terra', 'fuoco'];
-                let percentages = {};
-                
-                // Generate realistic percentages that sum to 100
-                let remaining = 100;
-                voices.forEach((voice, index) => {
-                    if (index === voices.length - 1) {
-                        percentages[voice] = remaining;
+                data.forEach(point => {
+                    if (Math.abs(point.amplitude) < lowAmplitudeThreshold) {
+                        currentPause++;
                     } else {
-                        const max = Math.min(remaining, 60);
-                        const min = Math.max(5, remaining - (voices.length - index - 1) * 40);
-                        percentages[voice] = Math.floor(Math.random() * (max - min + 1)) + min;
-                        remaining -= percentages[voice];
+                        if (currentPause > 0) {
+                            pauses.push(currentPause);
+                            currentPause = 0;
+                        }
                     }
                 });
-
-                // Shuffle to make it more realistic
-                const shuffled = Object.entries(percentages).sort(() => Math.random() - 0.5);
-                percentages = Object.fromEntries(shuffled);
-
-                this.displayVoiceAnalysis(percentages);
-            }
-
-            displayVoiceAnalysis(percentages) {
-                document.getElementById('voiceAnalysis').style.display = 'block';
                 
-                // Find highest percentage for highlighting
-                const highest = Object.entries(percentages).reduce((a, b) => 
-                    percentages[a[0]] > percentages[b[0]] ? a : b
-                )[0];
-
-                Object.entries(percentages).forEach(([voice, percentage]) => {
-                    const fillElement = document.getElementById(`${voice}Fill`);
-                    const valueElement = document.getElementById(`${voice}Value`);
-                    const containerElement = document.getElementById(`${voice}Percentage`);
-                    
-                    // Animate the fill
-                    setTimeout(() => {
-                        fillElement.style.width = percentage + '%';
-                        fillElement.textContent = percentage + '%';
-                        valueElement.textContent = percentage + '%';
-                        
-                        // Highlight the highest percentage
-                        if (voice === highest) {
-                            containerElement.classList.add('highest');
-                        } else {
-                            containerElement.classList.remove('highest');
-                        }
-                    }, 300);
-                });
-
-                const highestVoice = highest.charAt(0).toUpperCase() + highest.slice(1);
-                this.showNotification(`Voce dominante: ${highestVoice} (${percentages[highest]}%)`, 'success');
-            }
-
-            drawRecordedWaveform() {
-                const canvas = document.getElementById('recordedCanvas');
-                const ctx = canvas.getContext('2d');
-                
-                canvas.width = canvas.offsetWidth;
-                canvas.height = canvas.offsetHeight;
-                
-                const width = canvas.width;
-                const height = canvas.height;
-                const centerY = height / 2;
-                const margin = 20;
-                
-                // Clear canvas
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, width, height);
-                
-                // Draw grid
-                ctx.strokeStyle = '#f0f0f0';
-                ctx.lineWidth = 1;
-                for (let i = 0; i <= 8; i++) {
-                    const y = (height / 8) * i;
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(width, y);
-                    ctx.stroke();
-                }
-                
-                // Draw center line
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                ctx.beginPath();
-                ctx.moveTo(0, centerY);
-                ctx.lineTo(width, centerY);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                
-                // Draw recorded waveform
-                if (this.recordingData.length > 0) {
-                    ctx.strokeStyle = '#3498db';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    
-                    const step = (width - margin * 2) / this.recordingData.length;
-                    
-                    this.recordingData.forEach((point, index) => {
-                        const x = margin + index * step;
-                        const y = centerY + point.amplitude * (height / 4);
-                        
-                        if (index === 0) {
-                            ctx.moveTo(x, y);
-                        } else {
-                            ctx.lineTo(x, y);
-                        }
-                    });
-                    
-                    ctx.stroke();
-                    
-                    // Update description
-                    const duration = (this.recordingData.length * 50) / 1000; // Convert to seconds
-                    document.getElementById('recordedDescription').textContent = 
-                        `Registrazione: ${duration.toFixed(1)}s, ${this.recordingData.length} campioni`;
-                } else {
-                    document.getElementById('recordedDescription').textContent = 
-                        'Nessuna registrazione disponibile';
-                }
-            }
-
-            analyzeRecording() {
-                // Simulate AI prediction for targeted recording
-                const confidence = 0.7 + Math.random() * 0.25;
-                const isCorrect = Math.random() > 0.3;
-                const predictedVoice = isCorrect ? this.selectedVoice : this.getRandomVoice();
-                
-                const validationItem = {
-                    id: Date.now(),
-                    actualVoice: this.selectedVoice,
-                    predictedVoice: predictedVoice,
-                    confidence: confidence,
-                    timestamp: new Date(),
-                    validated: false
+                return {
+                    pauseCount: pauses.length,
+                    avgPauseLength: pauses.length > 0 ? pauses.reduce((a, b) => a + b, 0) / pauses.length : 0,
+                    totalDuration: data.length
                 };
-                
-                this.validationQueue.unshift(validationItem);
-                this.refreshValidationQueue();
-                
-                this.showNotification(`Analisi completata: ${predictedVoice.toUpperCase()} (${Math.round(confidence * 100)}%)`, 'success');
             }
 
-            getRandomVoice() {
-                const voices = ['aria', 'acqua', 'terra', 'fuoco'];
-                const filtered = voices.filter(v => v !== this.selectedVoice);
-                return filtered[Math.floor(Math.random() * filtered.length)];
-            }
-
-            generateValidationQueue() {
-                // Generate some sample validation items
-                const sampleItems = [
-                    { actualVoice: 'aria', predictedVoice: 'terra', confidence: 0.78 },
-                    { actualVoice: 'acqua', predictedVoice: 'acqua', confidence: 0.92 },
-                    { actualVoice: 'terra', predictedVoice: 'fuoco', confidence: 0.65 },
-                    { actualVoice: 'fuoco', predictedVoice: 'fuoco', confidence: 0.89 },
-                    { actualVoice: 'aria', predictedVoice: 'aria', confidence: 0.95 }
-                ];
-
-                this.validationQueue = sampleItems.map((item, index) => ({
-                    id: Date.now() + index,
-                    ...item,
-                    timestamp: new Date(Date.now() - Math.random() * 3600000),
-                    validated: false
-                }));
-
-                this.refreshValidationQueue();
-            }
-
-            refreshValidationQueue() {
-                const container = document.getElementById('validationQueue');
-                container.innerHTML = '';
-
-                if (this.validationQueue.length === 0) {
-                    container.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: #666;">
-                            <div style="font-size: 3em; margin-bottom: 15px;">✅</div>
-                            <p>Tutte le predizioni sono state validate!</p>
-                            <p style="font-size: 0.9em; margin-top: 5px;">Registra nuovi test per continuare il training</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                this.validationQueue.slice(0, 5).forEach(item => {
-                    const validationItem = this.createValidationItem(item);
-                    container.appendChild(validationItem);
-                });
-            }
-
-            createValidationItem(item) {
-                const div = document.createElement('div');
-                div.className = 'validation-item';
-                div.dataset.id = item.id;
-
-                const voiceIcons = {
-                    aria: '🌬️',
-                    acqua: '💧',
-                    terra: '🌍',
-                    fuoco: '🔥'
+            calculateVoiceScores(analysis) {
+                const scores = {
+                    aria: 0,
+                    acqua: 0,
+                    terra: 0,
+                    fuoco: 0
                 };
 
-                const isCorrect = item.actualVoice === item.predictedVoice;
-                const confidencePercent = Math.round(item.confidence * 100);
+                Object.keys(this.volumeProfiles).forEach(voice => {
+                    const profile = this.volumeProfiles[voice];
+                    
+                    const volumeDiff = Math.abs(analysis.volume.average - profile.baseVolume);
+                    const volumeScore = Math.max(0, 100 - (volumeDiff * 200));
+                    
+                    let patternScore = 0;
+                    if (analysis.volume.pattern === profile.volumePattern) {
+                        patternScore = 100;
+                    } else if (
+                        (analysis.volume.pattern === 'crescendo' && profile.volumePattern === 'explosive') ||
+                        (analysis.volume.pattern === 'stable' && profile.volumePattern === 'crescendo')
+                    ) {
+                        patternScore = 60;
+                    } else {
+                        patternScore = 20;
+                    }
+                    
+                    const finalVolumeDiff = Math.abs(analysis.volume.final - profile.finalVolume);
+                    const finalVolumeScore = Math.max(0, 100 - (finalVolumeDiff * 150));
+                    
+                    const volumeTotalScore = (volumeScore * 0.4 + patternScore * 0.4 + finalVolumeScore * 0.2);
+                    
+                    scores[voice] += volumeTotalScore * 0.6;
+                });
 
-                div.innerHTML = `
-                    <div class="prediction-row">
-                        <div class="prediction-info">
-                            <div class="predicted-voice">
-                                ${voiceIcons[item.predictedVoice]} Predizione: <strong>${item.predictedVoice.toUpperCase()}</strong>
-                                ${isCorrect ? '✅' : '❌'}
-                            </div>
-                            <div class="confidence">
-                                Affidabilità: ${confidencePercent}% • Registrato: ${item.timestamp.toLocaleTimeString('it-IT')}
-                            </div>
+                scores.aria += this.calculatePitchScore('aria', analysis.pitch) * 0.25;
+                scores.acqua += this.calculatePitchScore('acqua', analysis.pitch) * 0.25;
+                scores.terra += this.calculatePitchScore('terra', analysis.pitch) * 0.25;
+                scores.fuoco += this.calculatePitchScore('fuoco', analysis.pitch) * 0.25;
+
+                scores.aria += this.calculateEnergyScore('aria', analysis.energy) * 0.15;
+                scores.acqua += this.calculateEnergyScore('acqua', analysis.energy) * 0.15;
+                scores.terra += this.calculateEnergyScore('terra', analysis.energy) * 0.15;
+                scores.fuoco += this.calculateEnergyScore('fuoco', analysis.energy) * 0.15;
+
+                return scores;
+            }
+
+            calculatePitchScore(voice, pitchAnalysis) {
+                const pitchExpectations = {
+                    aria: { pattern: 'ascending', change: 30 },
+                    acqua: { pattern: 'descending', change: -20 },
+                    terra: { pattern: 'stable', change: 0 },
+                    fuoco: { pattern: 'ascending', change: 40 }
+                };
+
+                const expected = pitchExpectations[voice];
+                let score = 0;
+
+                if (pitchAnalysis.pattern === expected.pattern) {
+                    score += 70;
+                }
+
+                const changeDiff = Math.abs(pitchAnalysis.change - expected.change);
+                score += Math.max(0, 30 - changeDiff);
+
+                return Math.min(100, score);
+            }
+
+            calculateEnergyScore(voice, energyAnalysis) {
+                const energyExpectations = {
+                    aria: { level: 'medium', variability: 'medium' },
+                    acqua: { level: 'low', variability: 'low' },
+                    terra: { level: 'medium', variability: 'low' },
+                    fuoco: { level: 'high', variability: 'high' }
+                };
+
+                const expected = energyExpectations[voice];
+                let score = 50;
+
+                if (expected.level === 'low' && energyAnalysis.average < 0.3) score += 25;
+                else if (expected.level === 'medium' && energyAnalysis.average >= 0.3 && energyAnalysis.average <= 0.6) score += 25;
+                else if (expected.level === 'high' && energyAnalysis.average > 0.6) score += 25;
+
+                if (expected.variability === 'low' && energyAnalysis.variability < 0.2) score += 25;
+                else if (expected.variability === 'medium' && energyAnalysis.variability >= 0.2 && energyAnalysis.variability <= 0.4) score += 25;
+                else if (expected.variability === 'high' && energyAnalysis.variability > 0.4) score += 25;
+
+                return Math.min(100, score);
+            }
+
+            classifyVolume(volume) {
+                if (volume < this.volumeThresholds.low) return 'low';
+                if (volume < this.volumeThresholds.medium) return 'medium';
+                return 'high';
+            }
+
+            calculateVariability(values) {
+                const mean = values.reduce((a, b) => a + b, 0) / values.length;
+                const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+                return Math.sqrt(variance);
+            }
+
+            normalizeToPercentages(scores) {
+                const total = Object.values(scores).reduce((a, b) => a + b, 0);
+                const percentages = {};
+                
+                if (total === 0) {
+                    return { aria: 25, acqua: 25, terra: 25, fuoco: 25 };
+                }
+                
+                Object.keys(scores).forEach(voice => {
+                    percentages[voice] = Math.round((scores[voice] / total) * 100);
+                });
+                
+                const sum = Object.values(percentages).reduce((a, b) => a + b, 0);
+                if (sum !== 100) {
+                    const highest = Object.keys(percentages).reduce((a, b) => 
+                        percentages[a] > percentages[b] ? a : b
+                    );
+                    percentages[highest] += (100 - sum);
+                }
+                
+                return percentages;
+            }
+
+            getDominantVoice(percentages) {
+                return Object.keys(percentages).reduce((a, b) => 
+                    percentages[a] > percentages[b] ? a : b
+                );
+            }
+
+            calculateConfidence(scores) {
+                const values = Object.values(scores);
+                const max = Math.max(...values);
+                const secondMax = Math.max(...values.filter(v => v !== max));
+                const confidence = max > 0 ? (max - secondMax) / max : 0;
+                return Math.min(1, Math.max(0, confidence));
+            }
+
+            generateFallbackAnalysis() {
+                const percentages = {
+                    aria: 20 + Math.floor(Math.random() * 30),
+                    acqua: 15 + Math.floor(Math.random() * 25),
+                    terra: 20 + Math.floor(Math.random() * 30),
+                    fuoco: 15 + Math.floor(Math.random() * 25)
+                };
+                
+                const total = Object.values(percentages).reduce((a, b) => a + b, 0);
+                Object.keys(percentages).forEach(voice => {
+                    percentages[voice] = Math.round((percentages[voice] / total) * 100);
+                });
+                
+                return {
+                    percentages,
+                    analysis: {
+                        volume: { classification: 'medium', pattern: 'stable' },
+                        pitch: { pattern: 'stable' },
+                        energy: { level: 'medium' }
+                    },
+                    dominantVoice: this.getDominantVoice(percentages),
+                    confidence: 0.5
+                };
+            }
+        }
+
+        // Sistema di Confronto Waveform
+        class WaveformComparison {
+            constructor(app) {
+                this.app = app;
+                this.comparisonMode = false;
+                this.dominantVoice = null;
+            }
+
+            createComparisonPanel() {
+                const existingPanel = document.getElementById('comparisonPanel');
+                if (existingPanel) return;
+
+                const comparisonPanel = document.createElement('div');
+                comparisonPanel.id = 'comparisonPanel';
+                comparisonPanel.className = 'panel full-width';
+                comparisonPanel.innerHTML = `
+                    <h2 class="panel-title">🔄 Confronto Waveform - Reale vs Ideale</h2>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h4>Confronta la tua registrazione con il pattern ideale</h4>
+                            <p style="color: #666; font-size: 0.9em;">La voce dominante verrà automaticamente sovrapposta per il confronto</p>
                         </div>
-                        <div class="correction-buttons">
-                            <button class="correction-btn correct" onclick="validatePrediction('${item.id}', true)">
-                                ✅ Corretto
+                        <div style="display: flex; gap: 15px;">
+                            <button class="waveform-btn" onclick="comparison.toggleComparison()">
+                                🔄 Avvia Confronto
                             </button>
-                            <button class="correction-btn wrong" onclick="validatePrediction('${item.id}', false)">
-                                ❌ Sbagliato
+                            <button class="waveform-btn" onclick="comparison.calculateSimilarity()">
+                                📊 Calcola Similarità
                             </button>
                         </div>
                     </div>
-                    <div class="voice-correction" id="correction-${item.id}">
-                        <div class="voice-correct-btn" data-voice="aria" onclick="correctVoice('${item.id}', 'aria')">
-                            ${voiceIcons.aria} Aria
+
+                    <div class="comparison-container">
+                        <canvas id="comparisonCanvas" style="width: 100%; height: 250px; border: 1px solid #dee2e6; border-radius: 8px; background: white;"></canvas>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                            <div class="comparison-legend" style="display: flex; gap: 20px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 20px; height: 3px; background: #3498db; border-radius: 2px;"></div>
+                                    <span style="font-size: 0.9em;">Tua Registrazione</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 20px; height: 3px; background: #f39c12; border-radius: 2px;"></div>
+                                    <span style="font-size: 0.9em;">Pattern Ideale</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 20px; height: 3px; background: #27ae60; border-radius: 2px;"></div>
+                                    <span style="font-size: 0.9em;">Zone di Corrispondenza</span>
+                                </div>
+                            </div>
+                            
+                            <div id="similarityScore" style="font-weight: 600; font-size: 1.1em; color: #2c3e50;">
+                                Similarità: --
+                            </div>
                         </div>
-                        <div class="voice-correct-btn" data-voice="acqua" onclick="correctVoice('${item.id}', 'acqua')">
-                            ${voiceIcons.acqua} Acqua
-                        </div>
-                        <div class="voice-correct-btn" data-voice="terra" onclick="correctVoice('${item.id}', 'terra')">
-                            ${voiceIcons.terra} Terra
-                        </div>
-                        <div class="voice-correct-btn" data-voice="fuoco" onclick="correctVoice('${item.id}', 'fuoco')">
-                            ${voiceIcons.fuoco} Fuoco
+                    </div>
+
+                    <div class="analysis-results" id="comparisonAnalysis" style="display: none; margin-top: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                            
+                            <div class="analysis-card" style="border-left: 4px solid #3498db;">
+                                <h4 style="margin-bottom: 15px; color: #3498db;">📈 Analisi Differenze</h4>
+                                <div id="differenceAnalysis">
+                                    <!-- Risultati analisi differenze -->
+                                </div>
+                            </div>
+
+                            <div class="analysis-card" style="border-left: 4px solid #27ae60;">
+                                <h4 style="margin-bottom: 15px; color: #27ae60;">✅ Punti di Forza</h4>
+                                <div id="strengthsAnalysis">
+                                    <!-- Punti di forza -->
+                                </div>
+                            </div>
+
+                            <div class="analysis-card" style="border-left: 4px solid #f39c12;">
+                                <h4 style="margin-bottom: 15px; color: #f39c12;">🎯 Miglioramenti</h4>
+                                <div id="improvementsAnalysis">
+                                    <!-- Suggerimenti miglioramento -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
 
-                return div;
+                const validationPanel = document.querySelector('#validationQueue').closest('.panel');
+                validationPanel.parentNode.insertBefore(comparisonPanel, validationPanel.nextSibling);
             }
 
-            validatePrediction(itemId, isCorrect) {
-                const item = this.validationQueue.find(i => i.id == itemId);
-                if (!item) return;
+            setDominantVoice(percentages) {
+                this.dominantVoice = Object.entries(percentages).reduce((a, b) => 
+                    percentages[a[0]] > percentages[b[0]] ? a : b
+                )[0];
+                
+                console.log('Dominant voice set to:', this.dominantVoice);
+            }
 
-                if (isCorrect) {
-                    this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
-                    this.stats.correctPredictions++;
-                    this.showNotification('Predizione confermata come corretta', 'success');
-                } else {
-                    const correctionDiv = document.getElementById(`correction-${itemId}`);
-                    correctionDiv.classList.add('show');
+            toggleComparison() {
+                if (!this.app.recordingData || this.app.recordingData.length === 0) {
+                    this.app.showNotification('Registra prima una voce per il confronto', 'warning');
+                    return;
                 }
 
-                this.stats.validatedSamples++;
-                this.updateStats();
-                this.refreshValidationQueue();
-            }
+                if (!this.dominantVoice) {
+                    this.app.showNotification('Analizza prima la registrazione per determinare la voce dominante', 'warning');
+                    return;
+                }
 
-            correctVoice(itemId, correctVoice) {
-                const item = this.validationQueue.find(i => i.id == itemId);
-                if (!item) return;
-
-                item.actualVoice = correctVoice;
-                item.validated = true;
-
-                this.validationQueue = this.validationQueue.filter(i => i.id != itemId);
+                this.comparisonMode = !this.comparisonMode;
                 
-                this.stats.needsCorrection--;
-                this.stats.validatedSamples++;
-                
-                this.recalculateAccuracy();
-                this.updateStats();
-                this.refreshValidationQueue();
-
-                this.showNotification(`Correzione salvata: ${correctVoice.toUpperCase()}`, 'success');
+                if (this.comparisonMode) {
+                    this.drawComparisonWaveform();
+                    this.app.showNotification(`Confronto attivo: ${this.dominantVoice.toUpperCase()}`, 'info');
+                } else {
+                    this.clearComparison();
+                }
             }
 
-            recalculateAccuracy() {
-                Object.keys(this.stats.voiceAccuracy).forEach(voice => {
-                    const variation = (Math.random() - 0.5) * 4;
-                    this.stats.voiceAccuracy[voice] = Math.max(85, Math.min(99, 
-                        this.stats.voiceAccuracy[voice] + variation
-                    ));
-                });
+            drawComparisonWaveform() {
+                const canvas = document.getElementById('comparisonCanvas');
+                if (!canvas) {
+                    this.createComparisonPanel();
+                    setTimeout(() => this.drawComparisonWaveform(), 100);
+                    return;
+                }
 
-                const avgAccuracy = Object.values(this.stats.voiceAccuracy)
-                    .reduce((a, b) => a + b, 0) / 4;
-                this.stats.overallAccuracy = Math.round(avgAccuracy);
-            }
-
-            updateStats() {
-                document.getElementById('overallAccuracy').textContent = this.stats.overallAccuracy + '%';
-                document.getElementById('validatedSamples').textContent = this.stats.validatedSamples;
-                document.getElementById('correctPredictions').textContent = this.stats.correctPredictions;
-                document.getElementById('needsCorrection').textContent = this.stats.needsCorrection;
-
-                Object.keys(this.stats.voiceAccuracy).forEach(voice => {
-                    const accuracy = Math.round(this.stats.voiceAccuracy[voice]);
-                    document.getElementById(`${voice}Accuracy`).textContent = accuracy + '%';
-                    
-                    const bar = document.querySelector(`#${voice}Accuracy`).parentElement.nextElementSibling.querySelector('.accuracy-fill');
-                    bar.style.width = accuracy + '%';
-                });
-            }
-
-            showWaveform(voiceType) {
-                const canvas = document.getElementById('waveformCanvas');
                 const ctx = canvas.getContext('2d');
-                
                 canvas.width = canvas.offsetWidth;
                 canvas.height = canvas.offsetHeight;
                 
@@ -1279,11 +2035,18 @@
                 const margin = 40;
                 const maxAmplitude = (height / 2) - margin;
                 
-                // Clear canvas
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, width, height);
                 
-                // Draw grid
+                this.drawGrid(ctx, width, height);
+                this.drawIdealWaveform(ctx, width, height, centerY, maxAmplitude);
+                this.drawRecordedWaveform(ctx, width, height, centerY, maxAmplitude);
+                this.highlightMatchingAreas(ctx, width, height, centerY, maxAmplitude);
+            }
+
+            drawGrid(ctx, width, height) {
+                const centerY = height / 2;
+                
                 ctx.strokeStyle = '#f0f0f0';
                 ctx.lineWidth = 1;
                 for (let i = 0; i <= 10; i++) {
@@ -1294,7 +2057,6 @@
                     ctx.stroke();
                 }
                 
-                // Draw center line
                 ctx.strokeStyle = '#e0e0e0';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([5, 5]);
@@ -1303,10 +2065,12 @@
                 ctx.lineTo(width, centerY);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                
-                // Draw waveform
+            }
+
+            drawIdealWaveform(ctx, width, height, centerY, maxAmplitude) {
                 ctx.strokeStyle = '#f39c12';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 4;
+                ctx.globalAlpha = 0.7;
                 ctx.beginPath();
                 
                 const points = 200;
@@ -1317,39 +2081,7 @@
                 for (let i = 0; i < points; i++) {
                     const x = leftMargin + (drawWidth / points) * i;
                     const progress = i / points;
-                    let amplitude = 0;
-                    
-                    switch(voiceType) {
-                        case 'aria':
-                            amplitude = Math.sin(progress * Math.PI * 4) * 0.6 - (progress * 0.8);
-                            if (progress > 0.7) {
-                                amplitude += Math.sin(progress * Math.PI * 12) * 0.3;
-                            }
-                            amplitude = Math.max(-0.9, Math.min(0.3, amplitude));
-                            break;
-                            
-                        case 'acqua':
-                            amplitude = -Math.sin(progress * Math.PI * 2) * 0.4 + (progress * 0.7);
-                            if (progress > 0.8) {
-                                amplitude += Math.sin(progress * Math.PI * 20) * 0.2;
-                            }
-                            amplitude = Math.max(-0.3, Math.min(0.9, amplitude));
-                            break;
-                            
-                        case 'terra':
-                            amplitude = Math.sin(progress * Math.PI * 3) * 0.5 + (progress * 0.6);
-                            if (progress > 0.9) {
-                                amplitude = 0.8;
-                            }
-                            amplitude = Math.max(-0.2, Math.min(0.8, amplitude));
-                            break;
-                            
-                        case 'fuoco':
-                            amplitude = Math.sin(progress * Math.PI * 8) * 0.7;
-                            amplitude += Math.sin(progress * Math.PI * 16) * 0.3;
-                            amplitude = Math.max(-0.8, Math.min(0.8, amplitude));
-                            break;
-                    }
+                    let amplitude = this.getIdealAmplitude(this.dominantVoice, progress);
                     
                     const y = centerY + (amplitude * maxAmplitude);
                     
@@ -1361,114 +2093,230 @@
                 }
                 
                 ctx.stroke();
-                
-                this.addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude);
-                
-                const description = this.voicePatterns[voiceType].description;
-                document.getElementById('waveformDescription').textContent = description;
+                ctx.globalAlpha = 1.0;
             }
 
-            addVoiceMarkers(ctx, voiceType, width, height, centerY, maxAmplitude) {
-                ctx.font = '11px Arial';
-                ctx.fillStyle = '#e67e22';
-                ctx.textAlign = 'center';
+            drawRecordedWaveform(ctx, width, height, centerY, maxAmplitude) {
+                if (!this.app.recordingData || this.app.recordingData.length === 0) return;
                 
-                const safeTopY = centerY - maxAmplitude + 15;
-                const safeBottomY = centerY + maxAmplitude - 5;
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                const margin = 20;
+                const step = (width - margin * 2) / this.app.recordingData.length;
+                
+                this.app.recordingData.forEach((point, index) => {
+                    const x = margin + index * step;
+                    const normalizedAmplitude = Math.max(-1, Math.min(1, point.amplitude));
+                    const y = centerY + normalizedAmplitude * maxAmplitude;
+                    
+                    if (index === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                
+                ctx.stroke();
+            }
+
+            highlightMatchingAreas(ctx, width, height, centerY, maxAmplitude) {
+                if (!this.app.recordingData || this.app.recordingData.length === 0) return;
+                
+                const margin = 20;
+                const step = (width - margin * 2) / this.app.recordingData.length;
+                const tolerance = 0.3;
+                
+                ctx.strokeStyle = '#27ae60';
+                ctx.lineWidth = 6;
+                ctx.globalAlpha = 0.4;
+                
+                for (let i = 0; i < this.app.recordingData.length - 1; i++) {
+                    const progress = i / this.app.recordingData.length;
+                    const idealAmplitude = this.getIdealAmplitude(this.dominantVoice, progress);
+                    const recordedAmplitude = this.app.recordingData[i].amplitude;
+                    
+                    const difference = Math.abs(idealAmplitude - recordedAmplitude);
+                    
+                    if (difference <= tolerance) {
+                        const x1 = margin + i * step;
+                        const x2 = margin + (i + 1) * step;
+                        const y1 = centerY + recordedAmplitude * maxAmplitude;
+                        const y2 = centerY + this.app.recordingData[i + 1].amplitude * maxAmplitude;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.stroke();
+                    }
+                }
+                
+                ctx.globalAlpha = 1.0;
+            }
+
+            getIdealAmplitude(voiceType, progress) {
+                let amplitude = 0;
                 
                 switch(voiceType) {
                     case 'aria':
-                        ctx.fillText('↗️ Salite', width * 0.25, safeTopY);
-                        ctx.fillText('↗️ Aperture', width * 0.5, safeTopY - 10);
-                        ctx.fillText('↗️ Crescendo', width * 0.8, safeTopY);
+                        amplitude = Math.sin(progress * Math.PI * 4) * 0.6 - (progress * 0.8);
+                        if (progress > 0.7) {
+                            amplitude += Math.sin(progress * Math.PI * 12) * 0.3;
+                        }
+                        amplitude = Math.max(-0.9, Math.min(0.3, amplitude));
                         break;
                         
                     case 'acqua':
-                        ctx.fillText('↘️ Discesa fluida', width * 0.35, safeTopY);
-                        ctx.fillText('~~~~ Puntini finali', width * 0.8, safeBottomY);
+                        amplitude = -Math.sin(progress * Math.PI * 2) * 0.4 + (progress * 0.7);
+                        if (progress > 0.8) {
+                            amplitude += Math.sin(progress * Math.PI * 20) * 0.2;
+                        }
+                        amplitude = Math.max(-0.3, Math.min(0.9, amplitude));
                         break;
                         
                     case 'terra':
-                        ctx.fillText('↘️ Discesa strutturata', width * 0.4, safeTopY);
-                        ctx.fillText('✂️ Taglio netto', width * 0.85, safeBottomY);
+                        amplitude = Math.sin(progress * Math.PI * 3) * 0.5 + (progress * 0.6);
+                        if (progress > 0.9) {
+                            amplitude = 0.8;
+                        }
+                        amplitude = Math.max(-0.2, Math.min(0.8, amplitude));
                         break;
                         
                     case 'fuoco':
-                        ctx.fillText('⚡ Alta energia', width * 0.25, safeTopY);
-                        ctx.fillText('🔥 Ritmo incalzante', width * 0.75, safeTopY);
+                        amplitude = Math.sin(progress * Math.PI * 8) * 0.7;
+                        amplitude += Math.sin(progress * Math.PI * 16) * 0.3;
+                        amplitude = Math.max(-0.8, Math.min(0.8, amplitude));
                         break;
                 }
                 
-                ctx.textAlign = 'start';
+                return amplitude;
             }
 
-            showNotification(message, type = 'info') {
-                const notification = document.createElement('div');
-                notification.className = `notification ${type}`;
-                notification.textContent = message;
+            calculateSimilarity() {
+                if (!this.app.recordingData || this.app.recordingData.length === 0 || !this.dominantVoice) {
+                    this.app.showNotification('Dati insufficienti per il calcolo della similarità', 'warning');
+                    return;
+                }
+
+                const similarities = [];
+                const differences = [];
                 
-                document.body.appendChild(notification);
+                for (let i = 0; i < this.app.recordingData.length; i++) {
+                    const progress = i / this.app.recordingData.length;
+                    const idealAmplitude = this.getIdealAmplitude(this.dominantVoice, progress);
+                    const recordedAmplitude = this.app.recordingData[i].amplitude;
+                    
+                    const difference = Math.abs(idealAmplitude - recordedAmplitude);
+                    const similarity = Math.max(0, 1 - difference);
+                    
+                    similarities.push(similarity);
+                    differences.push(difference);
+                }
                 
-                setTimeout(() => notification.classList.add('show'), 100);
+                const avgSimilarity = similarities.reduce((a, b) => a + b, 0) / similarities.length;
+                const similarityPercentage = Math.round(avgSimilarity * 100);
                 
-                setTimeout(() => {
-                    notification.classList.remove('show');
-                    setTimeout(() => document.body.removeChild(notification), 300);
-                }, 4000);
+                document.getElementById('similarityScore').textContent = `Similarità: ${similarityPercentage}%`;
+                
+                this.showDetailedAnalysis(similarityPercentage, differences, similarities);
+                
+                this.app.showNotification(`Similarità calcolata: ${similarityPercentage}%`, 'success');
+            }
+
+            showDetailedAnalysis(similarity, differences, similarities) {
+                document.getElementById('comparisonAnalysis').style.display = 'block';
+                
+                const avgDifference = differences.reduce((a, b) => a + b, 0) / differences.length;
+                const maxDifference = Math.max(...differences);
+                const minDifference = Math.min(...differences);
+                
+                document.getElementById('differenceAnalysis').innerHTML = `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Differenza Media:</strong> ${(avgDifference * 100).toFixed(1)}%
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Differenza Massima:</strong> ${(maxDifference * 100).toFixed(1)}%
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Stabilità:</strong> ${maxDifference - minDifference < 0.5 ? 'Alta' : 'Media'}
+                    </div>
+                `;
+                
+                const strongPoints = similarities.filter(s => s > 0.8).length;
+                const strongPercentage = (strongPoints / similarities.length) * 100;
+                
+                document.getElementById('strengthsAnalysis').innerHTML = `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Zone Eccellenti:</strong> ${strongPercentage.toFixed(1)}%
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Corrispondenza Pattern:</strong> ${similarity > 70 ? 'Buona' : 'Da migliorare'}
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>Voce Dominante:</strong> ${this.dominantVoice.toUpperCase()}
+                    </div>
+                `;
+                
+                const improvements = this.generateImprovements(similarity, this.dominantVoice);
+                
+                document.getElementById('improvementsAnalysis').innerHTML = improvements.map(improvement => 
+                    `<div style="margin-bottom: 10px;">• ${improvement}</div>`
+                ).join('');
+            }
+
+            generateImprovements(similarity, voiceType) {
+                const improvements = [];
+                
+                if (similarity < 50) {
+                    improvements.push('Concentrati sulle caratteristiche base della voce');
+                }
+                
+                switch(voiceType) {
+                    case 'aria':
+                        if (similarity < 70) {
+                            improvements.push('Lavora sulle salite graduali del tono');
+                            improvements.push('Pratica le aperture progressive');
+                        }
+                        break;
+                    case 'acqua':
+                        if (similarity < 70) {
+                            improvements.push('Migliora la fluidità delle discese');
+                            improvements.push('Allunga i finali con puntini');
+                        }
+                        break;
+                    case 'terra':
+                        if (similarity < 70) {
+                            improvements.push('Rendi più netti i tagli finali');
+                            improvements.push('Stabilizza il tono medio');
+                        }
+                        break;
+                    case 'fuoco':
+                        if (similarity < 70) {
+                            improvements.push('Aumenta energia e dinamismo');
+                            improvements.push('Accelera il ritmo complessivo');
+                        }
+                        break;
+                }
+                
+                if (improvements.length === 0) {
+                    improvements.push('Ottimo lavoro! Continua così');
+                    improvements.push('Prova a perfezionare i dettagli');
+                }
+                
+                return improvements;
+            }
+
+            clearComparison() {
+                const canvas = document.getElementById('comparisonCanvas');
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                
+                document.getElementById('similarityScore').textContent = 'Similarità: --';
+                document.getElementById('comparisonAnalysis').style.display = 'none';
             }
         }
-
-        // Global functions
-        function validatePrediction(itemId, isCorrect) {
-            app.validatePrediction(itemId, isCorrect);
-        }
-
-        function correctVoice(itemId, voice) {
-            app.correctVoice(itemId, voice);
-        }
-
-        function showWaveform(voiceType) {
-            app.showWaveform(voiceType);
-        }
-
-        function generateNewSamples() {
-            app.generateValidationQueue();
-            app.showNotification('Nuovi campioni generati per la validazione', 'info');
-        }
-
-        function playRecorded() {
-            app.showNotification('Riproduzione simulata della registrazione', 'info');
-        }
-
-        function analyzeRecorded() {
-            if (app.recordingData.length > 0) {
-                app.showNotification('Rianalizzando la registrazione...', 'info');
-                setTimeout(() => {
-                    app.performAiAnalysis();
-                }, 1500);
-            } else {
-                app.showNotification('Nessuna registrazione da analizzare', 'warning');
-            }
-        }
-
-        function saveRecording() {
-            if (app.recordingData.length > 0) {
-                app.showNotification('Registrazione salvata nel database di training', 'success');
-            } else {
-                app.showNotification('Nessuna registrazione da salvare', 'warning');
-            }
-        }
-
-        // Initialize the application
-        let app;
-        document.addEventListener('DOMContentLoaded', () => {
-            app = new VoiceBreakTrainer();
-            
-            // Show default waveform
-            setTimeout(() => {
-                app.showWaveform('aria');
-            }, 500);
-        });
-    </script>
-</body>
-</html>
