@@ -275,6 +275,134 @@
             text-align: right;
         }
 
+        /* Targeted Results Styles */
+        .targeted-results {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #f39c12;
+            display: none;
+        }
+
+        .analysis-metrics {
+            margin: 15px 0;
+        }
+
+        .metric-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+
+        .metric-label {
+            min-width: 100px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .metric-bar {
+            flex: 1;
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            border-radius: 12px;
+            transition: width 0.8s ease;
+            position: relative;
+        }
+
+        .metric-fill.frequency {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        }
+
+        .metric-fill.decibels {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .metric-target {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: #2c3e50;
+            z-index: 2;
+            box-shadow: 0 0 0 1px white;
+        }
+
+        .metric-target::after {
+            content: 'Target';
+            position: absolute;
+            top: -25px;
+            left: -15px;
+            font-size: 0.7em;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            min-width: 70px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .pattern-indicator {
+            flex: 1;
+            padding: 8px 15px;
+            border-radius: 20px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .pattern-indicator.ascending {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .pattern-indicator.descending {
+            background: #e8f5e8;
+            color: #388e3c;
+        }
+
+        .pattern-indicator.stable {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .pattern-indicator.decisive {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .match-indicator {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .match-indicator.match {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .match-indicator.no-match {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
         /* Recorded Waveform */
         .recorded-waveform {
             background: #f8f9fa;
@@ -548,6 +676,11 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.6; }
         }
+
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(-100%); }
+        }
     </style>
 </head>
 <body>
@@ -668,11 +801,11 @@
                         <div class="stat-label">Campioni Validati</div>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-number" id="correctPredictions">798</span>
+                        <span class="stat-number" id="correctPredictions">799</span>
                         <div class="stat-label">Predizioni Corrette</div>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-number" id="needsCorrection">49</span>
+                        <span class="stat-number" id="needsCorrection">48</span>
                         <div class="stat-label">Da Correggere</div>
                     </div>
                 </div>
@@ -1164,17 +1297,154 @@
                 // Simula l'analisi
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 
-                // Simula risultati basati sulla voce selezionata
-                const accuracy = 0.7 + Math.random() * 0.25;
-                const isCorrect = Math.random() > 0.3;
+                // Genera analisi per il test mirato
+                const targetedAnalysis = this.generateTargetedAnalysis();
+                this.displayTargetedResults(targetedAnalysis);
                 
                 this.drawRecordedWaveform();
-                this.showNotification(`✅ Analisi completata - Accuratezza: ${Math.round(accuracy * 100)}%`, 'success');
+                this.showNotification(`✅ Analisi completata - Match: ${Math.round(targetedAnalysis.accuracy * 100)}%`, 'success');
                 
                 // Aggiorna le statistiche
                 this.updateStats();
                 
-                console.log('Targeted analysis completed');
+                console.log('Targeted analysis completed', targetedAnalysis);
+            }
+
+            generateTargetedAnalysis() {
+                const voiceCharacteristics = {
+                    aria: {
+                        intensity: 65, // Medio
+                        frequency: 450, // Hz - tono ascendente
+                        decibels: 72,
+                        pattern: 'ascending',
+                        phase: 'apertura'
+                    },
+                    acqua: {
+                        intensity: 35, // Basso
+                        frequency: 320, // Hz - tono discendente
+                        decibels: 65,
+                        pattern: 'descending',
+                        phase: 'bisogni'
+                    },
+                    terra: {
+                        intensity: 55, // Medio
+                        frequency: 380, // Hz - tono stabile
+                        decibels: 78,
+                        pattern: 'stable',
+                        phase: 'argomentazioni'
+                    },
+                    fuoco: {
+                        intensity: 85, // Alto
+                        frequency: 520, // Hz - tono deciso
+                        decibels: 82,
+                        pattern: 'decisive',
+                        phase: 'chiusura'
+                    }
+                };
+                
+                const target = voiceCharacteristics[this.selectedVoice];
+                const variation = () => (Math.random() - 0.5) * 20; // ±10 variazione
+                
+                return {
+                    selectedVoice: this.selectedVoice,
+                    target: target,
+                    measured: {
+                        intensity: Math.max(0, Math.min(100, target.intensity + variation())),
+                        frequency: Math.max(200, Math.min(600, target.frequency + variation() * 2)),
+                        decibels: Math.max(50, Math.min(90, target.decibels + variation() * 0.5)),
+                        pattern: target.pattern
+                    },
+                    accuracy: 0.7 + Math.random() * 0.25,
+                    match: Math.random() > 0.3
+                };
+            }
+
+            displayTargetedResults(analysis) {
+                // Crea o aggiorna il pannello dei risultati del test mirato
+                let resultsPanel = document.getElementById('targetedResults');
+                if (!resultsPanel) {
+                    resultsPanel = document.createElement('div');
+                    resultsPanel.id = 'targetedResults';
+                    resultsPanel.className = 'targeted-results';
+                    
+                    // Inserisci dopo l'area di registrazione
+                    const recordingArea = document.querySelector('.recording-area');
+                    recordingArea.insertAdjacentElement('afterend', resultsPanel);
+                }
+                
+                const voiceEmojis = {
+                    aria: '🌬️',
+                    acqua: '💧',
+                    terra: '🌍',
+                    fuoco: '🔥'
+                };
+                
+                const voiceNames = {
+                    aria: 'Aria',
+                    acqua: 'Acqua', 
+                    terra: 'Terra',
+                    fuoco: 'Fuoco'
+                };
+                
+                resultsPanel.innerHTML = `
+                    <h4 style="margin-bottom: 15px; text-align: center;">
+                        📊 Analisi ${voiceEmojis[analysis.selectedVoice]} ${voiceNames[analysis.selectedVoice]}
+                    </h4>
+                    
+                    <div class="analysis-metrics">
+                        <div class="metric-row">
+                            <div class="metric-label">🎚️ Intensità</div>
+                            <div class="metric-bar">
+                                <div class="metric-target" style="left: ${analysis.target.intensity}%"></div>
+                                <div class="metric-fill" style="width: ${analysis.measured.intensity}%"></div>
+                                <div class="metric-value">${Math.round(analysis.measured.intensity)}%</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <div class="metric-label">🎵 Frequenza</div>
+                            <div class="metric-bar">
+                                <div class="metric-target" style="left: ${((analysis.target.frequency - 200) / 400) * 100}%"></div>
+                                <div class="metric-fill frequency" style="width: ${((analysis.measured.frequency - 200) / 400) * 100}%"></div>
+                                <div class="metric-value">${Math.round(analysis.measured.frequency)} Hz</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <div class="metric-label">🔊 Decibel</div>
+                            <div class="metric-bar">
+                                <div class="metric-target" style="left: ${((analysis.target.decibels - 50) / 40) * 100}%"></div>
+                                <div class="metric-fill decibels" style="width: ${((analysis.measured.decibels - 50) / 40) * 100}%"></div>
+                                <div class="metric-value">${Math.round(analysis.measured.decibels)} dB</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-row">
+                            <div class="metric-label">📈 Pattern</div>
+                            <div class="pattern-indicator ${analysis.target.pattern}">
+                                ${this.getPatternDescription(analysis.target.pattern)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="match-indicator ${analysis.match ? 'match' : 'no-match'}">
+                        ${analysis.match ? '✅' : '⚠️'} 
+                        Match: ${Math.round(analysis.accuracy * 100)}%
+                        ${analysis.match ? '- Buona corrispondenza!' : '- Needs improvement'}
+                    </div>
+                `;
+                
+                resultsPanel.style.display = 'block';
+            }
+
+            getPatternDescription(pattern) {
+                const patterns = {
+                    ascending: '↗️ Ascendente',
+                    descending: '↘️ Discendente', 
+                    stable: '→ Stabile',
+                    decisive: '⚡ Deciso'
+                };
+                return patterns[pattern] || pattern;
             }
 
             async analyzeAiRecording() {
@@ -1195,7 +1465,7 @@
 
             generateVoicePercentages() {
                 // Genera percentuali che sommano a 100
-                let values = [
+                let voiceValues = [
                     Math.random() * 40 + 10, // 10-50%
                     Math.random() * 30 + 5,  // 5-35%
                     Math.random() * 25 + 5,  // 5-30%
@@ -1203,14 +1473,14 @@
                 ];
                 
                 // Normalizza a 100%
-                const sum = values.reduce((a, b) => a + b, 0);
-                values = values.map(v => (v / sum) * 100);
+                const sum = voiceValues.reduce((a, b) => a + b, 0);
+                voiceValues = voiceValues.map(v => (v / sum) * 100);
                 
                 return {
-                    aria: Math.round(values[0]),
-                    acqua: Math.round(values[1]),
-                    terra: Math.round(values[2]),
-                    fuoco: Math.round(values[3])
+                    aria: Math.round(voiceValues[0]),
+                    acqua: Math.round(voiceValues[1]),
+                    terra: Math.round(voiceValues[2]),
+                    fuoco: Math.round(voiceValues[3])
                 };
             }
 
@@ -1435,25 +1705,107 @@
             canvas.width = canvas.offsetWidth;
             canvas.height = canvas.offsetHeight;
             
-            // Pattern specifici per ogni voce
-            const patterns = {
-                aria: { freq: 0.05, amp: 60, color: '#74b9ff' },
-                acqua: { freq: 0.02, amp: 40, color: '#00b894' },
-                terra: { freq: 0.03, amp: 80, color: '#fdcb6e' },
-                fuoco: { freq: 0.08, amp: 90, color: '#fd79a8' }
+            // Pattern specifici per ogni voce con decibel realistici
+            const voicePatterns = {
+                aria: { 
+                    freq: 0.05, 
+                    amp: 60,        // Ampiezza media-alta (72 dB)
+                    color: '#74b9ff',
+                    decibels: 72,
+                    intensity: 65,
+                    pattern: 'ascending'
+                },
+                acqua: { 
+                    freq: 0.02, 
+                    amp: 35,        // Ampiezza bassa (65 dB) 
+                    color: '#00b894',
+                    decibels: 65,
+                    intensity: 35,
+                    pattern: 'descending'
+                },
+                terra: { 
+                    freq: 0.03, 
+                    amp: 55,        // Ampiezza media (78 dB)
+                    color: '#fdcb6e',
+                    decibels: 78,
+                    intensity: 55,
+                    pattern: 'stable'
+                },
+                fuoco: { 
+                    freq: 0.08, 
+                    amp: 85,        // Ampiezza alta (82 dB)
+                    color: '#fd79a8',
+                    decibels: 82,
+                    intensity: 85,
+                    pattern: 'decisive'
+                }
             };
             
-            const pattern = patterns[voice];
+            const pattern = voicePatterns[voice];
             
+            // Pulisci canvas
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // Disegna griglia di riferimento per i decibel
+            ctx.strokeStyle = '#e9ecef';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+            
+            // Linee orizzontali per livelli dB
+            const dbLevels = [60, 70, 80, 90];
+            dbLevels.forEach(db => {
+                const y = canvas.height - ((db - 50) / 40) * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+                
+                // Etichetta dB
+                ctx.fillStyle = '#999';
+                ctx.font = '10px Arial';
+                ctx.fillText(`${db}dB`, 5, y - 3);
+            });
+            
+            ctx.setLineDash([]);
+            
+            // Disegna la forma d'onda principale
             ctx.strokeStyle = pattern.color;
             ctx.lineWidth = 3;
             ctx.beginPath();
             
             for (let x = 0; x < canvas.width; x++) {
-                const y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp;
+                let y;
+                
+                // Pattern specifici per ogni voce
+                switch (pattern.pattern) {
+                    case 'ascending':
+                        // Aria: inizia basso e cresce
+                        const ascendingFactor = (x / canvas.width) * 0.7 + 0.3;
+                        y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp * ascendingFactor;
+                        break;
+                        
+                    case 'descending':
+                        // Acqua: inizia alto e decresce dolcemente
+                        const descendingFactor = 1 - (x / canvas.width) * 0.5;
+                        y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp * descendingFactor;
+                        break;
+                        
+                    case 'stable':
+                        // Terra: ampiezza costante, frequenza regolare
+                        y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp;
+                        break;
+                        
+                    case 'decisive':
+                        // Fuoco: alta energia, variazioni rapide
+                        const fireVariation = Math.sin(x * 0.1) * 0.3 + 0.7;
+                        y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp * fireVariation;
+                        break;
+                        
+                    default:
+                        y = canvas.height / 2 + Math.sin(x * pattern.freq) * pattern.amp;
+                }
+                
                 if (x === 0) {
                     ctx.moveTo(x, y);
                 } else {
@@ -1463,15 +1815,32 @@
             
             ctx.stroke();
             
+            // Aggiungi linea di riferimento per il livello dB specifico della voce
+            ctx.strokeStyle = pattern.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            const voiceDbY = canvas.height - ((pattern.decibels - 50) / 40) * canvas.height;
+            ctx.beginPath();
+            ctx.moveTo(0, voiceDbY);
+            ctx.lineTo(canvas.width, voiceDbY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Etichetta del livello della voce
+            ctx.fillStyle = pattern.color;
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(`${pattern.decibels}dB`, canvas.width - 50, voiceDbY - 5);
+            
+            // Descrizioni aggiornate con info sui decibel
             const descriptions = {
-                aria: 'Pattern ascendente con frequenze acute - Energia crescente',
-                acqua: 'Onde lunghe e fluide - Tono discendente e morbido',
-                terra: 'Pattern stabile e strutturato - Frequenze medie costanti',
-                fuoco: 'Oscillazioni rapide e intense - Energia alta e variabile'
+                aria: `🌬️ ARIA: ${pattern.decibels}dB - Pattern ascendente con frequenze acute - Energia crescente (Intensità: ${pattern.intensity}%)`,
+                acqua: `💧 ACQUA: ${pattern.decibels}dB - Onde lunghe e fluide - Tono discendente e morbido (Intensità: ${pattern.intensity}%)`,
+                terra: `🌍 TERRA: ${pattern.decibels}dB - Pattern stabile e strutturato - Frequenze medie costanti (Intensità: ${pattern.intensity}%)`,
+                fuoco: `🔥 FUOCO: ${pattern.decibels}dB - Oscillazioni rapide e intense - Energia alta e variabile (Intensità: ${pattern.intensity}%)`
             };
             
             document.getElementById('waveformDescription').textContent = descriptions[voice];
-            trainer.showNotification(`📊 Visualizzando pattern: ${voice.toUpperCase()}`, 'info');
+            trainer.showNotification(`📊 Visualizzando: ${voice.toUpperCase()} - ${pattern.decibels}dB`, 'info');
         }
 
         function generateNewSamples() {
@@ -1493,16 +1862,6 @@
                 trainer.cleanup();
             }
         });
-
-        // Aggiungi animazione CSS per fadeOut
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fadeOut {
-                from { opacity: 1; transform: translateX(0); }
-                to { opacity: 0; transform: translateX(-100%); }
-            }
-        `;
-        document.head.appendChild(style);
 
         console.log('🎯 Voice Break Trainer caricato correttamente!');
     </script>
