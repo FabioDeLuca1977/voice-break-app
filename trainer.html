@@ -677,7 +677,87 @@
             50% { opacity: 0.6; }
         }
 
-        @keyframes fadeOut {
+        /* AI Detailed Results Styles */
+        .ai-detailed-results {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+            display: none;
+        }
+
+        .ai-analysis-container {
+            width: 100%;
+        }
+
+        .ai-analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-top: 15px;
+        }
+
+        .ai-detailed-metrics {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .ai-voice-percentages {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .voice-percentage-compact {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid transparent;
+        }
+
+        .voice-percentage-compact.highest {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .voice-name-compact {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            min-width: 80px;
+        }
+
+        .percentage-bar-compact {
+            background: #e9ecef;
+            border-radius: 8px;
+            height: 16px;
+            flex: 1;
+            margin: 0 12px;
+            overflow: hidden;
+        }
+
+        .percentage-value-compact {
+            font-weight: 700;
+            font-size: 0.9em;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        @media (max-width: 768px) {
+            .ai-analysis-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
             from { opacity: 1; transform: translateX(0); }
             to { opacity: 0; transform: translateX(-100%); }
         }
@@ -1461,12 +1541,198 @@
                 
                 // Genera percentuali realistiche per le 4 voci
                 const percentages = this.generateVoicePercentages();
+                
+                // Genera anche l'analisi dettagliata per l'AI
+                const aiDetailedAnalysis = this.generateAiDetailedAnalysis(percentages);
+                
+                // Mostra entrambe le visualizzazioni
                 this.displayVoiceAnalysis(percentages);
+                this.displayAiDetailedAnalysis(aiDetailedAnalysis, percentages);
                 
                 this.drawRecordedWaveform();
                 this.showNotification('✅ Analisi AI completata', 'success');
                 
-                console.log('AI analysis completed', percentages);
+                console.log('AI analysis completed', { percentages, detailed: aiDetailedAnalysis });
+            }
+
+            generateAiDetailedAnalysis(percentages) {
+                // Trova la voce dominante
+                const dominantVoice = Object.keys(percentages).reduce((a, b) => 
+                    percentages[a] > percentages[b] ? a : b
+                );
+                
+                const voiceCharacteristics = {
+                    aria: { intensity: 65, frequency: 450, decibels: 72, pattern: 'ascending' },
+                    acqua: { intensity: 35, frequency: 320, decibels: 65, pattern: 'descending' },
+                    terra: { intensity: 55, frequency: 380, decibels: 78, pattern: 'stable' },
+                    fuoco: { intensity: 85, frequency: 520, decibels: 82, pattern: 'decisive' }
+                };
+                
+                // Calcola i valori medi pesati basati sulle percentuali
+                let weightedIntensity = 0;
+                let weightedFrequency = 0;
+                let weightedDecibels = 0;
+                
+                Object.keys(percentages).forEach(voice => {
+                    const weight = percentages[voice] / 100;
+                    const chars = voiceCharacteristics[voice];
+                    
+                    weightedIntensity += chars.intensity * weight;
+                    weightedFrequency += chars.frequency * weight;
+                    weightedDecibels += chars.decibels * weight;
+                });
+                
+                const variation = () => (Math.random() - 0.5) * 10; // ±5 variazione
+                
+                return {
+                    dominantVoice: dominantVoice,
+                    measured: {
+                        intensity: Math.max(0, Math.min(100, weightedIntensity + variation())),
+                        frequency: Math.max(200, Math.min(600, weightedFrequency + variation() * 2)),
+                        decibels: Math.max(50, Math.min(90, weightedDecibels + variation() * 0.5)),
+                        pattern: voiceCharacteristics[dominantVoice].pattern
+                    },
+                    target: voiceCharacteristics[dominantVoice],
+                    accuracy: 0.75 + Math.random() * 0.2,
+                    match: percentages[dominantVoice] > 30
+                };
+            }
+
+            displayAiDetailedAnalysis(analysis, percentages) {
+                // Crea o aggiorna il pannello dei risultati AI dettagliati
+                let aiResultsPanel = document.getElementById('aiDetailedResults');
+                if (!aiResultsPanel) {
+                    aiResultsPanel = document.createElement('div');
+                    aiResultsPanel.id = 'aiDetailedResults';
+                    aiResultsPanel.className = 'ai-detailed-results';
+                    
+                    // Trova il pannello dell'Analisi AI e inserisci dopo l'analisi delle voci
+                    const voiceAnalysis = document.getElementById('voiceAnalysis');
+                    if (voiceAnalysis) {
+                        voiceAnalysis.insertAdjacentElement('afterend', aiResultsPanel);
+                    }
+                }
+                
+                const voiceEmojis = {
+                    aria: '🌬️',
+                    acqua: '💧',
+                    terra: '🌍',
+                    fuoco: '🔥'
+                };
+                
+                const voiceNames = {
+                    aria: 'Aria',
+                    acqua: 'Acqua', 
+                    terra: 'Terra',
+                    fuoco: 'Fuoco'
+                };
+                
+                aiResultsPanel.innerHTML = `
+                    <div class="ai-analysis-container">
+                        <h4 style="margin-bottom: 20px; text-align: center;">
+                            🤖 Analisi Completa - Voce Dominante: ${voiceEmojis[analysis.dominantVoice]} ${voiceNames[analysis.dominantVoice]}
+                        </h4>
+                        
+                        <div class="ai-analysis-grid">
+                            <!-- Colonna Sinistra: Analisi Dettagliata -->
+                            <div class="ai-detailed-metrics">
+                                <h5 style="margin-bottom: 15px; color: #3498db;">📊 Metriche Dettagliate</h5>
+                                
+                                <div class="metric-row">
+                                    <div class="metric-label">🎚️ Intensità</div>
+                                    <div class="metric-bar">
+                                        <div class="metric-target" style="left: ${analysis.target.intensity}%"></div>
+                                        <div class="metric-fill" style="width: ${analysis.measured.intensity}%"></div>
+                                    </div>
+                                    <div class="metric-value">${Math.round(analysis.measured.intensity)}%</div>
+                                </div>
+                                
+                                <div class="metric-row">
+                                    <div class="metric-label">🎵 Frequenza</div>
+                                    <div class="metric-bar">
+                                        <div class="metric-target" style="left: ${((analysis.target.frequency - 200) / 400) * 100}%"></div>
+                                        <div class="metric-fill frequency" style="width: ${((analysis.measured.frequency - 200) / 400) * 100}%"></div>
+                                    </div>
+                                    <div class="metric-value">${Math.round(analysis.measured.frequency)} Hz</div>
+                                </div>
+                                
+                                <div class="metric-row">
+                                    <div class="metric-label">🔊 Decibel</div>
+                                    <div class="metric-bar">
+                                        <div class="metric-target" style="left: ${((analysis.target.decibels - 50) / 40) * 100}%"></div>
+                                        <div class="metric-fill decibels" style="width: ${((analysis.measured.decibels - 50) / 40) * 100}%"></div>
+                                    </div>
+                                    <div class="metric-value">${Math.round(analysis.measured.decibels)} dB</div>
+                                </div>
+                                
+                                <div class="metric-row">
+                                    <div class="metric-label">📈 Pattern</div>
+                                    <div class="pattern-indicator ${analysis.target.pattern}">
+                                        ${this.getPatternDescription(analysis.target.pattern)}
+                                    </div>
+                                </div>
+                                
+                                <div class="match-indicator ${analysis.match ? 'match' : 'no-match'}" style="margin-top: 15px;">
+                                    ${analysis.match ? '✅' : '⚠️'} 
+                                    Match: ${Math.round(analysis.accuracy * 100)}%
+                                    ${analysis.match ? '- Ottima corrispondenza!' : '- Migliorabile'}
+                                </div>
+                            </div>
+                            
+                            <!-- Colonna Destra: Percentuali Voci -->
+                            <div class="ai-voice-percentages">
+                                <h5 style="margin-bottom: 15px; color: #3498db;">🎭 Composizione Vocale</h5>
+                                
+                                <div class="voice-percentage-compact ${percentages.aria >= Math.max(percentages.acqua, percentages.terra, percentages.fuoco) ? 'highest' : ''}">
+                                    <div class="voice-name-compact">
+                                        <span>🌬️</span>
+                                        <span>Aria</span>
+                                    </div>
+                                    <div class="percentage-bar-compact">
+                                        <div class="percentage-fill aria" style="width: ${percentages.aria}%"></div>
+                                    </div>
+                                    <div class="percentage-value-compact">${percentages.aria}%</div>
+                                </div>
+
+                                <div class="voice-percentage-compact ${percentages.acqua >= Math.max(percentages.aria, percentages.terra, percentages.fuoco) ? 'highest' : ''}">
+                                    <div class="voice-name-compact">
+                                        <span>💧</span>
+                                        <span>Acqua</span>
+                                    </div>
+                                    <div class="percentage-bar-compact">
+                                        <div class="percentage-fill acqua" style="width: ${percentages.acqua}%"></div>
+                                    </div>
+                                    <div class="percentage-value-compact">${percentages.acqua}%</div>
+                                </div>
+
+                                <div class="voice-percentage-compact ${percentages.terra >= Math.max(percentages.aria, percentages.acqua, percentages.fuoco) ? 'highest' : ''}">
+                                    <div class="voice-name-compact">
+                                        <span>🌍</span>
+                                        <span>Terra</span>
+                                    </div>
+                                    <div class="percentage-bar-compact">
+                                        <div class="percentage-fill terra" style="width: ${percentages.terra}%"></div>
+                                    </div>
+                                    <div class="percentage-value-compact">${percentages.terra}%</div>
+                                </div>
+
+                                <div class="voice-percentage-compact ${percentages.fuoco >= Math.max(percentages.aria, percentages.acqua, percentages.terra) ? 'highest' : ''}">
+                                    <div class="voice-name-compact">
+                                        <span>🔥</span>
+                                        <span>Fuoco</span>
+                                    </div>
+                                    <div class="percentage-bar-compact">
+                                        <div class="percentage-fill fuoco" style="width: ${percentages.fuoco}%"></div>
+                                    </div>
+                                    <div class="percentage-value-compact">${percentages.fuoco}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                aiResultsPanel.style.display = 'block';
+                console.log('Pannello AI dettagliato creato e mostrato');
             }
 
             generateVoicePercentages() {
