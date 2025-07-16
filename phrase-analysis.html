@@ -439,10 +439,10 @@
         class PhraseDetector {
             constructor(sampleRate = 44100) {
                 this.sampleRate = sampleRate;
-                this.minPhraseLength = 0.5; // Ridotto per test
+                this.minPhraseLength = 0.3; // Molto più sensibile
                 this.maxPhraseLength = 10.0;
-                this.silenceThreshold = 0.002; // Ridotto per maggiore sensibilità
-                this.minPauseBetweenPhrases = 0.2; // Ridotto
+                this.silenceThreshold = 0.001; // Più sensibile
+                this.minPauseBetweenPhrases = 0.1; // Più sensibile
                 this.smoothingWindow = 0.05;
                 this.energyHistory = [];
                 this.logger = new DebugLogger();
@@ -460,26 +460,44 @@
                 const overallRMS = Math.sqrt(audioBuffer.reduce((sum, val) => sum + val * val, 0) / audioBuffer.length);
                 this.logger.log(`RMS generale: ${overallRMS.toFixed(6)}`);
                 
-                if (overallRMS < 0.001) {
-                    this.logger.log('Audio troppo silenzioso. RMS < 0.001', 'warning');
-                }
+                // Soglia dinamica più permissiva
+                const dynamicThreshold = Math.max(0.0005, overallRMS * 0.1);
+                this.logger.log(`Soglia dinamica: ${dynamicThreshold.toFixed(6)}`);
                 
                 // 1. Calcola energia smoothed
                 const energySignal = this.calculateSmoothEnergy(audioBuffer);
                 this.logger.log(`Calcolati ${energySignal.length} punti di energia`);
                 
-                // 2. Rileva segmenti vocali
-                const voiceSegments = this.detectVoiceActivity(energySignal);
+                // 2. Rileva segmenti vocali con soglia più bassa
+                const voiceSegments = this.detectVoiceActivityPermissive(energySignal, dynamicThreshold);
                 this.logger.log(`Rilevati ${voiceSegments.length} segmenti vocali`);
                 
                 if (voiceSegments.length === 0) {
-                    this.logger.log('Nessun segmento vocale rilevato. Prova a parlare più forte.', 'warning');
-                    return [];
+                    // Prova con soglia ancora più bassa
+                    const emergencyThreshold = overallRMS * 0.05;
+                    this.logger.log(`Tentativo con soglia di emergenza: ${emergencyThreshold.toFixed(6)}`);
+                    const emergencySegments = this.detectVoiceActivityPermissive(energySignal, emergencyThreshold);
+                    this.logger.log(`Segmenti con soglia di emergenza: ${emergencySegments.length}`);
+                    
+                    if (emergencySegments.length === 0) {
+                        this.logger.log('Nessun segmento vocale rilevato neanche con soglia minima.', 'error');
+                        return [];
+                    }
+                    return this.processSegments(emergencySegments, audioBuffer);
                 }
                 
+                return this.processSegments(voiceSegments, audioBuffer);
+            }
+            
+            processSegments(voiceSegments, audioBuffer) {
                 // 3. Raggruppa in frasi
-                const phrases = this.groupIntoLinguisticPhrases(voiceSegments, energySignal);
+                const phrases = this.groupIntoLinguisticPhrasesPermissive(voiceSegments);
                 this.logger.log(`Raggruppate in ${phrases.length} frasi`);
+                
+                if (phrases.length === 0) {
+                    this.logger.log('Nessuna frase dopo raggruppamento', 'warning');
+                    return [];
+                }
                 
                 // 4. Analizza caratteristiche
                 const phrasesWithFeatures = this.analyzePhrasesFeatures(phrases, audioBuffer);
@@ -491,16 +509,16 @@
             calculateSmoothEnergy(audioBuffer) {
                 const windowSize = Math.floor(this.smoothingWindow * this.sampleRate);
                 const energySignal = [];
-                const stepSize = Math.max(1, Math.floor(windowSize / 8)); // Più punti di campionamento
+                const stepSize = Math.max(1, Math.floor(windowSize / 10)); // Più punti
                 
                 for (let i = 0; i < audioBuffer.length - windowSize; i += stepSize) {
                     let energy = 0;
                     
                     for (let j = 0; j < windowSize && i + j < audioBuffer.length; j++) {
-                        energy += audioBuffer[i + j] * audioBuffer[i + j];
+                        energy += Math.abs(audioBuffer[i + j]); // Usa valore assoluto invece di quadrato
                     }
                     
-                    energy = Math.sqrt(energy / windowSize);
+                    energy = energy / windowSize; // Media semplice
                     
                     energySignal.push({
                         time: i / this.sampleRate,
@@ -512,15 +530,9 @@
                 return energySignal;
             }
             
-            detectVoiceActivity(energySignal) {
+            detectVoiceActivityPermissive(energySignal, threshold) {
                 const segments = [];
                 let currentSegment = null;
-                
-                // Soglia dinamica più sensibile
-                const energies = energySignal.map(e => e.energy);
-                const sortedEnergies = [...energies].sort((a, b) => a - b);
-                const percentile20 = sortedEnergies[Math.floor(sortedEnergies.length * 0.15)]; // Ridotto da 0.25
-                const threshold = Math.max(this.silenceThreshold, percentile20);
                 
                 this.logger.log(`Soglia rilevamento: ${threshold.toFixed(6)}`);
                 
@@ -541,6 +553,7 @@
                         currentSegment.endSample = point.sample;
                         currentSegment.duration = currentSegment.endTime - currentSegment.startTime;
                         
+                        // Soglia durata più permissiva
                         if (currentSegment.duration >= this.minPhraseLength) {
                             segments.push(currentSegment);
                             this.logger.log(`Segmento: ${currentSegment.startTime.toFixed(2)}s - ${currentSegment.endTime.toFixed(2)}s (${currentSegment.duration.toFixed(2)}s)`);
@@ -550,7 +563,7 @@
                     }
                 }
                 
-                // Chiudi ultimo segmento
+                // Chiudi ultimo segmento se presente
                 if (currentSegment) {
                     const lastPoint = energySignal[energySignal.length - 1];
                     currentSegment.endTime = lastPoint.time;
@@ -559,15 +572,17 @@
                     
                     if (currentSegment.duration >= this.minPhraseLength) {
                         segments.push(currentSegment);
+                        this.logger.log(`Ultimo segmento: ${currentSegment.startTime.toFixed(2)}s - ${currentSegment.endTime.toFixed(2)}s`);
                     }
                 }
                 
                 return segments;
             }
             
-            groupIntoLinguisticPhrases(voiceSegments, energySignal) {
+            groupIntoLinguisticPhrasesPermissive(voiceSegments) {
                 if (voiceSegments.length === 0) return [];
                 
+                // Più permissivo nel raggruppamento
                 const phrases = [];
                 let currentPhrase = [voiceSegments[0]];
                 
@@ -577,8 +592,8 @@
                     
                     const pauseDuration = currentSegment.startTime - prevSegment.endTime;
                     
-                    // Criteri più flessibili per il raggruppamento
-                    if (pauseDuration > this.minPauseBetweenPhrases * 3) { // Era * 2.5
+                    // Criteri molto più flessibili
+                    if (pauseDuration > 1.0) { // Solo pause molto lunghe separano le frasi
                         phrases.push(this.createPhraseFromSegments(currentPhrase));
                         currentPhrase = [currentSegment];
                     } else {
@@ -668,27 +683,55 @@
                 this.setupEventListeners();
                 this.setupAudioVisualizer();
                 this.logger.log('App inizializzata con successo', 'success');
-                
-                // Test compatibilità
                 this.checkBrowserCompatibility();
             }
             
             checkBrowserCompatibility() {
                 this.logger.log('Controllo compatibilità browser...');
                 
-                if (!navigator.mediaDevices) {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     this.logger.log('MediaDevices API non supportata', 'error');
                     this.showError('Browser non compatibile. Usa Chrome o Firefox.');
                     return;
                 }
                 
-                if (!navigator.mediaDevices.getUserMedia) {
-                    this.logger.log('getUserMedia non supportato', 'error');
-                    this.showError('getUserMedia non supportato. Aggiorna il browser.');
-                    return;
-                }
-                
                 this.logger.log('Browser compatibile ✅', 'success');
+                
+                // Test MediaRecorder support
+                try {
+                    if (typeof MediaRecorder === 'undefined') {
+                        this.logger.log('MediaRecorder non supportato', 'error');
+                        this.showError('MediaRecorder non supportato. Aggiorna il browser.');
+                        return;
+                    }
+                    
+                    // Test codec supportati
+                    const supportedTypes = [
+                        'audio/webm',
+                        'audio/webm;codecs=opus',
+                        'audio/mp4',
+                        'audio/mpeg'
+                    ];
+                    
+                    let workingType = null;
+                    for (const type of supportedTypes) {
+                        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+                            workingType = type;
+                            break;
+                        }
+                    }
+                    
+                    if (workingType) {
+                        this.supportedMimeType = workingType;
+                        this.logger.log(`Codec supportato: ${workingType}`, 'success');
+                    } else {
+                        this.supportedMimeType = undefined;
+                        this.logger.log('Nessun codec preferito trovato, uso default', 'warning');
+                    }
+                    
+                } catch (error) {
+                    this.logger.log(`Errore test MediaRecorder: ${error.message}`, 'error');
+                }
             }
             
             setupEventListeners() {
@@ -727,11 +770,72 @@
                         } 
                     });
                     
+                    this.logger.log('Microfono accessibile ✅', 'success');
+                    this.showSuccess('Microfono funziona correttamente!');
+                    
+                    // Test breve del segnale
+                    const audioContext = new AudioContext();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    const analyser = audioContext.createAnalyser();
+                    source.connect(analyser);
+                    
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    
+                    let testCount = 0;
+                    const testInterval = setInterval(() => {
+                        analyser.getByteFrequencyData(dataArray);
+                        const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
+                        
+                        this.logger.log(`Livello audio: ${average.toFixed(1)}`);
+                        
+                        if (++testCount >= 5) {
+                            clearInterval(testInterval);
+                            stream.getTracks().forEach(track => track.stop());
+                            this.logger.log('Test microfono completato', 'success');
+                        }
+                    }, 500);
+                    
+                } catch (error) {
+                    this.logger.log(`Errore microfono: ${error.message}`, 'error');
+                    this.showError('Errore accesso microfono. Controlla i permessi.');
+                }
+            }
+            
+            async startRecording() {
+                this.logger.log('Avvio registrazione...');
+                
+                try {
+                    // Prima ottieni lo stream
+                    this.audioStream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            sampleRate: 44100,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true
+                        } 
+                    });
+                    
                     this.logger.log('Stream audio ottenuto', 'success');
                     
-                    this.mediaRecorder = new MediaRecorder(this.audioStream, {
-                        mimeType: 'audio/webm;codecs=opus'
-                    });
+                    // Poi crea MediaRecorder con gestione errori migliorata
+                    try {
+                        let recorderOptions = {};
+                        
+                        // Prova con il tipo supportato se disponibile
+                        if (this.supportedMimeType) {
+                            recorderOptions.mimeType = this.supportedMimeType;
+                            this.logger.log(`Usando mimeType: ${this.supportedMimeType}`);
+                        }
+                        
+                        this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
+                        this.logger.log('MediaRecorder creato con successo', 'success');
+                        
+                    } catch (recorderError) {
+                        this.logger.log(`Errore creazione MediaRecorder con opzioni: ${recorderError.message}`, 'warning');
+                        // Fallback senza opzioni
+                        this.mediaRecorder = new MediaRecorder(this.audioStream);
+                        this.logger.log('MediaRecorder creato senza opzioni specifiche', 'success');
+                    }
                     
                     this.recordedChunks = [];
                     
@@ -744,11 +848,19 @@
                     
                     this.mediaRecorder.onstop = () => {
                         this.logger.log('MediaRecorder fermato');
-                        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
-                        this.logger.log(`Blob creato: ${blob.size} bytes`);
+                        const blob = new Blob(this.recordedChunks, { 
+                            type: this.mediaRecorder.mimeType || 'audio/webm' 
+                        });
+                        this.logger.log(`Blob creato: ${blob.size} bytes, tipo: ${blob.type}`);
                         this.processRecordedAudio(blob);
                     };
                     
+                    this.mediaRecorder.onerror = (event) => {
+                        this.logger.log(`Errore MediaRecorder: ${event.error}`, 'error');
+                        this.showError('Errore durante la registrazione');
+                    };
+                    
+                    // Avvia registrazione
                     this.mediaRecorder.start(100);
                     this.isRecording = true;
                     this.recordingStartTime = Date.now();
@@ -761,17 +873,33 @@
                     
                 } catch (error) {
                     this.logger.log(`Errore avvio registrazione: ${error.message}`, 'error');
-                    this.showError('Errore durante l\'avvio della registrazione. Verifica i permessi del microfono.');
+                    this.showError(`Errore durante l'avvio della registrazione: ${error.message}`);
+                    
+                    // Cleanup in caso di errore
+                    if (this.audioStream) {
+                        this.audioStream.getTracks().forEach(track => track.stop());
+                        this.audioStream = null;
+                    }
                 }
             }
             
             stopRecording() {
                 if (this.mediaRecorder && this.isRecording) {
                     this.logger.log('Fermando registrazione...');
-                    this.mediaRecorder.stop();
-                    this.audioStream.getTracks().forEach(track => track.stop());
-                    this.isRecording = false;
                     
+                    try {
+                        this.mediaRecorder.stop();
+                        this.logger.log('MediaRecorder.stop() chiamato');
+                    } catch (error) {
+                        this.logger.log(`Errore stop MediaRecorder: ${error.message}`, 'error');
+                    }
+                    
+                    if (this.audioStream) {
+                        this.audioStream.getTracks().forEach(track => track.stop());
+                        this.audioStream = null;
+                    }
+                    
+                    this.isRecording = false;
                     this.updateRecordingUI(false);
                     this.stopRealtimeVisualizer();
                     
@@ -782,31 +910,36 @@
             startRealtimeVisualizer() {
                 if (!this.audioStream) return;
                 
-                const audioContext = new AudioContext();
-                const source = audioContext.createMediaStreamSource(this.audioStream);
-                const analyser = audioContext.createAnalyser();
-                
-                analyser.fftSize = 256;
-                source.connect(analyser);
-                
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                
-                const updateVisualizer = () => {
-                    if (!this.isRecording) return;
+                try {
+                    const audioContext = new AudioContext();
+                    const source = audioContext.createMediaStreamSource(this.audioStream);
+                    const analyser = audioContext.createAnalyser();
                     
-                    analyser.getByteFrequencyData(dataArray);
-                    this.updateAudioBars(dataArray);
+                    analyser.fftSize = 256;
+                    source.connect(analyser);
                     
-                    // Log del livello audio ogni secondo
-                    if (Date.now() % 1000 < 50) {
-                        const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
-                        this.logger.log(`Livello real-time: ${average.toFixed(1)}`);
-                    }
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
                     
-                    requestAnimationFrame(updateVisualizer);
-                };
-                
-                updateVisualizer();
+                    const updateVisualizer = () => {
+                        if (!this.isRecording) return;
+                        
+                        analyser.getByteFrequencyData(dataArray);
+                        this.updateAudioBars(dataArray);
+                        
+                        // Log del livello audio ogni 2 secondi
+                        if (Date.now() % 2000 < 50) {
+                            const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
+                            this.logger.log(`Livello real-time: ${average.toFixed(1)}`);
+                        }
+                        
+                        requestAnimationFrame(updateVisualizer);
+                    };
+                    
+                    updateVisualizer();
+                    
+                } catch (error) {
+                    this.logger.log(`Errore visualizer: ${error.message}`, 'error');
+                }
             }
             
             updateAudioBars(dataArray) {
@@ -814,7 +947,7 @@
                 const step = Math.floor(dataArray.length / bars.length);
                 
                 bars.forEach((bar, index) => {
-                    const value = dataArray[index * step];
+                    const value = dataArray[index * step] || 0;
                     const height = (value / 255) * 100;
                     bar.style.height = `${height}%`;
                 });
@@ -875,32 +1008,40 @@
             async processRecordedAudio(blob) {
                 try {
                     this.logger.log('Processando audio registrato...');
+                    this.logger.log(`Blob: ${blob.size} bytes, tipo: ${blob.type}`);
                     
                     const arrayBuffer = await blob.arrayBuffer();
                     this.logger.log(`ArrayBuffer size: ${arrayBuffer.byteLength} bytes`);
                     
                     const audioContext = new AudioContext();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                     
-                    const audioData = audioBuffer.getChannelData(0);
-                    const duration = audioBuffer.duration;
-                    
-                    this.logger.log(`Audio decodificato: ${duration.toFixed(2)}s, ${audioData.length} samples`, 'success');
-                    
-                    // Calcola RMS per verifica
-                    const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
-                    this.logger.log(`RMS audio: ${rms.toFixed(6)}`);
-                    
-                    if (rms < 0.0001) {
-                        this.logger.log('Audio molto silenzioso!', 'warning');
-                        this.showWarning('Audio registrato sembra molto silenzioso. Prova a parlare più forte.');
+                    try {
+                        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                        
+                        const audioData = audioBuffer.getChannelData(0);
+                        const duration = audioBuffer.duration;
+                        
+                        this.logger.log(`Audio decodificato: ${duration.toFixed(2)}s, ${audioData.length} samples`, 'success');
+                        
+                        // Calcola RMS per verifica
+                        const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
+                        this.logger.log(`RMS audio: ${rms.toFixed(6)}`);
+                        
+                        if (rms < 0.0001) {
+                            this.logger.log('Audio molto silenzioso!', 'warning');
+                            this.showWarning('Audio registrato sembra silenzioso. Prova a parlare più forte.');
+                        }
+                        
+                        this.currentAudioData = audioData;
+                        this.currentAudioDuration = duration;
+                        
+                        document.getElementById('analyzePhrases').disabled = false;
+                        this.showSuccess(`Audio registrato: ${duration.toFixed(1)}s`);
+                        
+                    } catch (decodeError) {
+                        this.logger.log(`Errore decodifica audio: ${decodeError.message}`, 'error');
+                        this.showError('Errore nella decodifica dell\'audio. Prova un formato diverso.');
                     }
-                    
-                    this.currentAudioData = audioData;
-                    this.currentAudioDuration = duration;
-                    
-                    document.getElementById('analyzePhrases').disabled = false;
-                    this.showSuccess(`Audio registrato: ${duration.toFixed(1)}s`);
                     
                 } catch (error) {
                     this.logger.log(`Errore processamento audio: ${error.message}`, 'error');
@@ -952,11 +1093,11 @@
                     
                     if (phrases.length === 0) {
                         this.logger.log('Nessuna frase rilevata dopo analisi completa', 'error');
-                        this.showError('Nessuna frase rilevata. Prova a registrare di nuovo parlando più chiaramente con pause tra le frasi.');
+                        this.showError('Nessuna frase rilevata. Prova a registrare di nuovo parlando più forte e con pause più chiare tra le frasi.');
                         return;
                     }
                     
-                    // Crea un risultato mock per mostrare il sistema funzionante
+                    // Crea un risultato per mostrare il sistema funzionante
                     const result = {
                         phrases: phrases,
                         summary: {
@@ -1008,6 +1149,13 @@
                         backgroundColor: 'rgba(102, 126, 234, 0.7)',
                         borderColor: 'rgba(102, 126, 234, 1)',
                         borderWidth: 2
+                    }, {
+                        label: 'Durata (secondi)',
+                        data: phrases.map(p => p.duration),
+                        backgroundColor: 'rgba(253, 121, 168, 0.7)',
+                        borderColor: 'rgba(253, 121, 168, 1)',
+                        borderWidth: 2,
+                        yAxisID: 'y1'
                     }]
                 };
                 
@@ -1020,14 +1168,41 @@
                         plugins: {
                             title: {
                                 display: true,
-                                text: 'Analisi Volume per Frase'
+                                text: 'Analisi Frasi Rilevate'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const phrase = phrases[context.dataIndex];
+                                        return [
+                                            `Inizio: ${phrase.startTime.toFixed(1)}s`,
+                                            `Fine: ${phrase.endTime.toFixed(1)}s`,
+                                            `Segmenti: ${phrase.segmentCount}`
+                                        ];
+                                    }
+                                }
                             }
                         },
                         scales: {
                             y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
                                 title: {
                                     display: true,
                                     text: 'Volume (dB)'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Durata (s)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false,
                                 }
                             }
                         }
@@ -1100,52 +1275,9 @@
 
         // === INIZIALIZZAZIONE APP ===
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🚀 Initializing Phrase-Based Voice Analysis with Debug...');
+            console.log('🚀 Initializing Phrase-Based Voice Analysis with MediaRecorder Fix...');
             const app = new PhraseAnalysisApp();
         });
     </script>
 </body>
 </html>
-                        } 
-                    });
-                    
-                    this.logger.log('Microfono accessibile ✅', 'success');
-                    this.showSuccess('Microfono funziona correttamente!');
-                    
-                    // Test breve del segnale
-                    const audioContext = new AudioContext();
-                    const source = audioContext.createMediaStreamSource(stream);
-                    const analyser = audioContext.createAnalyser();
-                    source.connect(analyser);
-                    
-                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                    
-                    let testCount = 0;
-                    const testInterval = setInterval(() => {
-                        analyser.getByteFrequencyData(dataArray);
-                        const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
-                        
-                        this.logger.log(`Livello audio: ${average.toFixed(1)}`);
-                        
-                        if (++testCount >= 5) {
-                            clearInterval(testInterval);
-                            stream.getTracks().forEach(track => track.stop());
-                            this.logger.log('Test microfono completato', 'success');
-                        }
-                    }, 500);
-                    
-                } catch (error) {
-                    this.logger.log(`Errore microfono: ${error.message}`, 'error');
-                    this.showError('Errore accesso microfono. Controlla i permessi.');
-                }
-            }
-            
-            async startRecording() {
-                this.logger.log('Avvio registrazione...');
-                
-                try {
-                    this.audioStream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: {
-                            sampleRate: 44100,
-                            channelCount: 1,
-                            echoCancellation: true,
