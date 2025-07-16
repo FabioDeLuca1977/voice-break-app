@@ -91,6 +91,11 @@
             background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
         }
 
+        /* 🆕 NUOVO STILE PER L'ANALISI FRASI */
+        .card.phrase-section::before {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+        }
+
         .card-icon {
             font-size: 4em;
             margin-bottom: 20px;
@@ -167,6 +172,15 @@
 
         .btn.developer:hover {
             box-shadow: 0 8px 25px rgba(239, 83, 80, 0.4);
+        }
+
+        /* 🆕 NUOVO STILE PULSANTE ANALISI FRASI */
+        .btn.phrase-analysis {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+        }
+
+        .btn.phrase-analysis:hover {
+            box-shadow: 0 8px 25px rgba(0, 184, 148, 0.4);
         }
 
         .status-bar {
@@ -347,6 +361,22 @@
                     <li>Esercizi guidati e suggerimenti</li>
                 </ul>
                 <a href="voice-selection.html" class="btn">Inizia Training</a>
+            </div>
+
+            <!-- 🆕 NUOVA SEZIONE ANALISI FRASI -->
+            <div class="card phrase-section">
+                <span class="card-icon">🎯</span>
+                <h2 class="card-title">Analisi Frasi</h2>
+                <p class="card-description">
+                    Sistema avanzato di analisi vocale basato su frasi complete per risultati più intuitivi
+                </p>
+                <ul class="card-features">
+                    <li>Rilevamento automatico delle frasi</li>
+                    <li>Grafici basati su unità linguistiche</li>
+                    <li>Classificazione delle 4 voci per frase</li>
+                    <li>Feedback più preciso e comprensibile</li>
+                </ul>
+                <a href="phrase-analysis.html" class="btn phrase-analysis">Analizza per Frasi</a>
             </div>
 
             <div class="card trainer-section">
