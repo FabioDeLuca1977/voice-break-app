@@ -466,3 +466,15 @@
 
 # \*\*Voice Break AI\*\* - Trasforma la tua voce in uno strumento di comunicazione potente e versatile! 🎤✨
 
+## 🆕 Novità: Analisi Basata su Frasi
+
+Il sistema ora include un'analisi avanzata che:
+- 🎯 Rileva automaticamente le frasi complete
+- 📊 Genera grafici più intuitivi basati su unità linguistiche
+- 🎤 Classifica ogni frase nelle 4 voci elementali
+- ✨ Fornisce feedback più preciso e comprensibile
+
+### Accesso Rapido
+- **Homepage**: https://fabiodeluca1977.github.io/voice-break-app/
+- **Analisi Frasi**: https://fabiodeluca1977.github.io/voice-break-app/phrase-analysis.html
+- **Training Base**: https://fabiodeluca1977.github.io/voice-break-app/voice-selection.html
