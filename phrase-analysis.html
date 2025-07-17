@@ -141,10 +141,10 @@
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
         }
 
-        .voice-card.aria { background: linear-gradient(135deg, #74b9ff, #0984e3); color: white; }
-        .voice-card.acqua { background: linear-gradient(135deg, #00b894, #00a085); color: white; }
-        .voice-card.terra { background: linear-gradient(135deg, #fdcb6e, #e17055); color: white; }
-        .voice-card.fuoco { background: linear-gradient(135deg, #fd79a8, #e84393); color: white; }
+        .voice-card.aria { background: linear-gradient(135deg, #87CEEB, #4682B4); color: white; }
+        .voice-card.acqua { background: linear-gradient(135deg, #20B2AA, #008B8B); color: white; }
+        .voice-card.terra { background: linear-gradient(135deg, #D2691E, #8B4513); color: white; }
+        .voice-card.fuoco { background: linear-gradient(135deg, #FF6347, #DC143C); color: white; }
 
         .audio-visualizer {
             height: 60px;
@@ -306,10 +306,10 @@
             border-left: 4px solid #667eea;
         }
 
-        .phrase-card.trend-ascending { border-left-color: #00b894; }
-        .phrase-card.trend-descending { border-left-color: #74b9ff; }
-        .phrase-card.trend-stable { border-left-color: #fdcb6e; }
-        .phrase-card.trend-dynamic { border-left-color: #fd79a8; }
+        .phrase-card.trend-ascending { border-left-color: #87CEEB; }
+        .phrase-card.trend-descending { border-left-color: #20B2AA; }
+        .phrase-card.trend-stable { border-left-color: #D2691E; }
+        .phrase-card.trend-dynamic { border-left-color: #FF6347; }
 
         .phrase-title {
             font-weight: bold;
@@ -323,10 +323,88 @@
             margin-bottom: 5px;
         }
 
-        .trend-ascending { color: #00b894; }
-        .trend-descending { color: #74b9ff; }
-        .trend-stable { color: #fdcb6e; }
-        .trend-dynamic { color: #fd79a8; }
+        .trend-ascending { color: #4682B4; }
+        .trend-descending { color: #008B8B; }
+        .trend-stable { color: #8B4513; }
+        .trend-dynamic { color: #DC143C; }
+
+        .phrase-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .speak-btn {
+            background: linear-gradient(45deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .speak-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(108, 117, 125, 0.4);
+        }
+
+        .speak-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .speak-btn.speaking {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            animation: pulse-speak 1s infinite;
+        }
+
+        @keyframes pulse-speak {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .tts-controls {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .tts-controls h4 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .voice-settings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .voice-setting {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .voice-setting label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 3px;
+        }
+
+        .voice-setting input, .voice-setting select {
+            padding: 5px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            font-size: 14px;
+        }
 
         .chart-container {
             background: white;
@@ -353,17 +431,13 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <h1>🎤 Voice Break AI</h1>
             <p>Analisi Vocale Basata su Frasi per le 4 Voci Elementali</p>
         </div>
 
-        <!-- Pannello Principale -->
         <div class="main-panel">
-            <!-- Controlli -->
             <div class="controls-grid">
-                <!-- Registrazione -->
                 <div class="control-section">
                     <h3>🎙️ Registrazione Audio</h3>
                     <button id="testMicrophone" class="btn">
@@ -386,7 +460,6 @@
                     <div class="timer-display" id="recordingTime">00:00</div>
                 </div>
 
-                <!-- Selezione Voce -->
                 <div class="control-section">
                     <h3>🎯 Voce Target (Opzionale)</h3>
                     <div class="voice-selector">
@@ -410,7 +483,6 @@
                     <small style="color: #6c757d;">💡 Puoi anche usare l'auto-rilevamento senza selezionare una voce</small>
                 </div>
 
-                <!-- Analisi -->
                 <div class="control-section">
                     <h3>🔬 Analisi Frasi</h3>
                     <button id="analyzePhrases" class="btn phrase-analysis" disabled>
@@ -426,10 +498,38 @@
                         Carica Audio
                     </label>
                     <input type="file" id="fileInput" accept="audio/*" style="display: none;">
+                    
+                    <!-- Controlli Text-to-Speech -->
+                    <div class="tts-controls">
+                        <h4>🔊 Text-to-Speech</h4>
+                        <div class="voice-settings">
+                            <div class="voice-setting">
+                                <label>Velocità</label>
+                                <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Pitch</label>
+                                <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Volume</label>
+                                <input type="range" id="speechVolume" min="0" max="1" step="0.1" value="0.8">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Voce</label>
+                                <select id="speechVoice">
+                                    <option value="">Default</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="speakAllPhrases" class="btn" disabled>
+                            <span>🎤</span>
+                            Leggi Tutte le Frasi
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Risultato Auto-Rilevamento -->
             <div class="auto-detection-result" id="autoDetectionResult">
                 <div class="detected-voice" id="detectedVoice">🎤 Analizzando...</div>
                 <div class="confidence-score" id="confidenceScore">Precisione: --</div>
@@ -453,7 +553,6 @@
                 </div>
             </div>
 
-            <!-- Messaggi -->
             <div class="error-message" id="errorMessage"></div>
             <div class="success-message" id="successMessage"></div>
             <div class="warning-message" id="warningMessage"></div>
@@ -463,7 +562,6 @@
                 <div>Analizzando le frasi...</div>
             </div>
 
-            <!-- Debug Section -->
             <div class="debug-section">
                 <div class="debug-title">🔍 Log di Debug</div>
                 <div class="debug-log" id="debugLog">
@@ -471,9 +569,7 @@
                 </div>
             </div>
 
-            <!-- Risultati Analisi Frasi -->
             <div class="phrase-results" id="phraseResults">
-                <!-- Summary Cards -->
                 <div class="phrases-summary" id="phrasesSummary">
                     <div class="summary-card">
                         <div class="summary-number" id="totalPhrases">0</div>
@@ -493,17 +589,12 @@
                     </div>
                 </div>
 
-                <!-- Info Frasi -->
-                <div class="phrase-info-grid" id="phraseInfoGrid">
-                    <!-- Popolato dinamicamente -->
-                </div>
+                <div class="phrase-info-grid" id="phraseInfoGrid"></div>
 
-                <!-- Grafico Timeline Continuo -->
                 <div class="chart-container">
                     <canvas id="volumeTrendChart"></canvas>
                 </div>
 
-                <!-- Grafico Confronto Normalizzato -->
                 <div class="chart-container">
                     <canvas id="individualPhrasesChart"></canvas>
                 </div>
@@ -511,10 +602,7 @@
         </div>
     </div>
 
-    <!-- JavaScript -->
     <script>
-        // === DEBUG UTILITIES ===
-        
         class DebugLogger {
             constructor() {
                 this.logElement = null;
@@ -553,8 +641,6 @@
             }
         }
 
-        // === ENHANCED PHRASE DETECTOR CON ANALISI TEMPORALE ===
-        
         class PhraseDetector {
             constructor(logger) {
                 this.logger = logger;
@@ -647,10 +733,8 @@
                     const endSample = Math.floor(segment.endTime * this.sampleRate);
                     const phraseAudio = audioBuffer.slice(startSample, endSample);
                     
-                    // Analisi temporale dettagliata del volume
                     const temporalAnalysis = this.analyzeTemporalVolume(phraseAudio, segment.duration);
                     
-                    // Calcola features della frase
                     const rms = Math.sqrt(phraseAudio.reduce((sum, val) => sum + val * val, 0) / phraseAudio.length);
                     const avgVolume = rms > 0 ? 20 * Math.log10(rms) : -60;
                     
@@ -675,7 +759,7 @@
             }
             
             analyzeTemporalVolume(phraseAudio, duration) {
-                const numPoints = 20; // Punti di campionamento per frase
+                const numPoints = 20;
                 const stepSize = Math.floor(phraseAudio.length / numPoints);
                 
                 const volumeData = [];
@@ -694,7 +778,6 @@
                     timeData.push(parseFloat(time.toFixed(2)));
                 }
                 
-                // Determina il trend
                 const trend = this.determineTrend(volumeData);
                 const volumeChange = volumeData[volumeData.length - 1] - volumeData[0];
                 
@@ -714,24 +797,21 @@
                 const end = volumeData[volumeData.length - 1];
                 const change = end - start;
                 
-                // Calcola variabilità
                 const avg = volumeData.reduce((sum, v) => sum + v, 0) / volumeData.length;
                 const variance = volumeData.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / volumeData.length;
                 
-                if (variance > 8) { // Alta variabilità
+                if (variance > 8) {
                     return 'dynamic';
-                } else if (change > 3) { // Crescita significativa
+                } else if (change > 3) {
                     return 'ascending';
-                } else if (change < -3) { // Decrescita significativa
+                } else if (change < -3) {
                     return 'descending';
-                } else { // Relativamente stabile
+                } else {
                     return 'stable';
                 }
             }
         }
 
-        // === VOICE CLASSIFIER ===
-        
         class VoiceClassifier {
             constructor(logger) {
                 this.logger = logger;
@@ -789,7 +869,6 @@
                 
                 this.logger.log(`Features: Vol=${globalFeatures.avgVolume.toFixed(1)}dB, Trend dominante=${trendAnalysis.dominantTrend}`);
                 
-                // Calcola punteggi per ogni voce includendo i trend
                 const scores = {};
                 for (const [voiceName, profile] of Object.entries(this.voiceProfiles)) {
                     scores[voiceName] = this.calculateVoiceScoreWithTrend(globalFeatures, trendAnalysis, profile);
@@ -848,7 +927,6 @@
                     }
                 });
                 
-                // Trova trend dominante
                 const dominantTrend = Object.keys(trendCounts).reduce((a, b) => 
                     trendCounts[a] > trendCounts[b] ? a : b
                 );
@@ -867,23 +945,18 @@
             calculateVoiceScoreWithTrend(features, trendAnalysis, profile) {
                 let score = 0;
                 
-                // Score volume (peso 25%)
                 const volumeScore = this.scoreInRange(features.avgVolume, profile.volumeRange);
                 score += volumeScore * 0.25;
                 
-                // Score pitch (peso 20%)
                 const pitchScore = this.scoreInRange(features.avgPitch, profile.pitchRange);
                 score += pitchScore * 0.20;
                 
-                // Score energia (peso 15%)
                 const energyScore = this.scoreInRange(features.avgEnergy, profile.energyLevel);
                 score += energyScore * 0.15;
                 
-                // Score ritmo (peso 15%)
                 const rhythmScore = this.scoreInRange(features.rhythm, profile.rhythmRange);
                 score += rhythmScore * 0.15;
                 
-                // Score trend (peso 25% - NUOVO!)
                 const trendScore = this.scoreTrend(trendAnalysis, profile.expectedTrend);
                 score += trendScore * 0.25;
                 
@@ -893,15 +966,13 @@
             scoreTrend(trendAnalysis, expectedTrend) {
                 const { dominantTrend, consistency, trendCounts } = trendAnalysis;
                 
-                // Punteggio base se il trend dominante corrisponde
                 let score = 0;
                 if (dominantTrend === expectedTrend) {
-                    score = consistency; // 0-1 basato su quanto è consistente
+                    score = consistency;
                 } else {
-                    // Punteggio parziale se c'è almeno qualche frase con il trend giusto
                     const expectedCount = trendCounts[expectedTrend] || 0;
                     const totalPhrases = Object.values(trendCounts).reduce((a, b) => a + b, 0);
-                    score = expectedCount / totalPhrases * 0.5; // Massimo 0.5 se non dominante
+                    score = expectedCount / totalPhrases * 0.5;
                 }
                 
                 return score;
@@ -935,8 +1006,6 @@
             }
         }
 
-        // === MAIN APPLICATION ===
-        
         class PhraseAnalysisApp {
             constructor() {
                 this.logger = new DebugLogger();
@@ -951,15 +1020,21 @@
                 this.currentAudioDuration = null;
                 this.volumeTrendChart = null;
                 this.individualPhrasesChart = null;
+                this.speechSynth = window.speechSynthesis;
+                this.availableVoices = [];
+                this.currentPhrases = [];
+                this.isSpeaking = false;
                 
                 this.initializeApp();
             }
             
             initializeApp() {
+                // Aspetta che il DOM sia completamente caricato
                 if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', () => this.finishInitialization());
                 } else {
-                    this.finishInitialization();
+                    // Se il DOM è già caricato, inizializza subito
+                    setTimeout(() => this.finishInitialization(), 100);
                 }
             }
             
@@ -970,6 +1045,7 @@
                 
                 this.setupEventListeners();
                 this.setupAudioVisualizer();
+                this.setupTextToSpeech();
                 this.logger.log('App inizializzata con successo', 'success');
                 this.checkBrowserCompatibility();
             }
@@ -1028,10 +1104,49 @@
                 document.getElementById('analyzePhrases').addEventListener('click', () => this.analyzePhrases());
                 document.getElementById('clearResults').addEventListener('click', () => this.clearResults());
                 document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileUpload(e));
+                document.getElementById('speakAllPhrases').addEventListener('click', () => this.speakAllPhrases());
                 
                 document.querySelectorAll('.voice-card').forEach(card => {
                     card.addEventListener('click', () => this.selectVoice(card.dataset.voice));
                 });
+            }
+            
+            setupTextToSpeech() {
+                // Verifica che speechSynthesis sia disponibile
+                if (!this.speechSynth) {
+                    this.logger.log('Speech Synthesis non disponibile', 'warning');
+                    return;
+                }
+                
+                // Carica le voci disponibili
+                const loadVoices = () => {
+                    try {
+                        this.availableVoices = this.speechSynth.getVoices();
+                        const voiceSelect = document.getElementById('speechVoice');
+                        
+                        if (voiceSelect) {
+                            voiceSelect.innerHTML = '<option value="">Default</option>';
+                            
+                            this.availableVoices.forEach((voice, index) => {
+                                const option = document.createElement('option');
+                                option.value = index;
+                                option.textContent = `${voice.name} (${voice.lang})`;
+                                voiceSelect.appendChild(option);
+                            });
+                            
+                            this.logger.log(`Caricate ${this.availableVoices.length} voci TTS`, 'success');
+                        }
+                    } catch (error) {
+                        this.logger.log(`Errore caricamento voci TTS: ${error.message}`, 'error');
+                    }
+                };
+                
+                // Le voci potrebbero non essere disponibili immediatamente
+                if (this.speechSynth.getVoices().length > 0) {
+                    loadVoices();
+                } else {
+                    this.speechSynth.addEventListener('voiceschanged', loadVoices);
+                }
             }
             
             setupAudioVisualizer() {
@@ -1433,16 +1548,16 @@
             displayResults(result) {
                 document.getElementById('phraseResults').style.display = 'block';
                 
-                // Aggiorna summary
                 document.getElementById('totalPhrases').textContent = result.summary.totalPhrases;
                 document.getElementById('dominantVoice').textContent = `🎤 ${result.summary.dominantVoice}`;
                 document.getElementById('avgPhraseDuration').textContent = `${result.summary.avgDuration.toFixed(1)}s`;
                 document.getElementById('overallClarity').textContent = result.summary.clarityLabel;
                 
-                // Mostra info frasi
-                this.displayPhraseInfoCards(result.phrases);
+                // Salva le frasi per il TTS
+                this.currentPhrases = result.phrases;
+                document.getElementById('speakAllPhrases').disabled = false;
                 
-                // Crea grafici avanzati
+                this.displayPhraseInfoCards(result.phrases);
                 this.createVolumeTrendChart(result.phrases);
                 this.createIndividualPhrasesChart(result.phrases);
             }
@@ -1458,11 +1573,14 @@
                     dynamic: '🎢 Dinamico'
                 };
                 
-                phrases.forEach(phrase => {
+                phrases.forEach((phrase, index) => {
                     if (!phrase.temporalAnalysis) return;
                     
                     const card = document.createElement('div');
                     card.className = `phrase-card trend-${phrase.temporalAnalysis.trend}`;
+                    
+                    // Genera testo esempio per la frase
+                    const sampleText = this.generateSampleText(phrase.temporalAnalysis.trend, phrase.duration);
                     
                     card.innerHTML = `
                         <div class="phrase-title">Frase ${phrase.index + 1}</div>
@@ -1472,10 +1590,199 @@
                         <div>Durata: ${phrase.duration.toFixed(1)}s</div>
                         <div>Cambio: ${phrase.temporalAnalysis.volumeChange > 0 ? '+' : ''}${phrase.temporalAnalysis.volumeChange.toFixed(1)}dB</div>
                         <div>Media: ${phrase.temporalAnalysis.avgVolume.toFixed(1)}dB</div>
+                        <div style="margin-top: 8px; font-style: italic; color: #666; font-size: 12px;">
+                            "${sampleText}"
+                        </div>
+                        <div class="phrase-controls">
+                            <button class="speak-btn" data-phrase-index="${index}">
+                                <span>🔊</span>
+                                Ascolta
+                            </button>
+                        </div>
                     `;
+                    
+                    // Aggiungi event listener al pulsante
+                    const speakBtn = card.querySelector('.speak-btn');
+                    speakBtn.addEventListener('click', () => this.speakPhrase(index));
                     
                     container.appendChild(card);
                 });
+            }
+            
+            generateSampleText(trend, duration) {
+                const samples = {
+                    ascending: [
+                        "Sono sempre più motivato",
+                        "La mia energia cresce",
+                        "Vedo nuove possibilità",
+                        "Sento l'entusiasmo che sale"
+                    ],
+                    descending: [
+                        "Ora mi sento più calmo",
+                        "La tensione si dissolve",
+                        "Trovo la mia pace interiore",
+                        "Il rilassamento mi avvolge"
+                    ],
+                    stable: [
+                        "Sono centrato e presente",
+                        "Mantengo il mio equilibrio",
+                        "La stabilità è la mia forza",
+                        "Procedo con determinazione"
+                    ],
+                    dynamic: [
+                        "L'energia scorre in me",
+                        "Sento il ritmo del cambiamento",
+                        "Ogni momento è una nuova avventura",
+                        "La vita pulsa attraverso di me"
+                    ]
+                };
+                
+                const trendSamples = samples[trend] || samples.stable;
+                return trendSamples[Math.floor(Math.random() * trendSamples.length)];
+            }
+            
+            speakPhrase(phraseIndex) {
+                try {
+                    if (this.isSpeaking) {
+                        this.speechSynth.cancel();
+                        this.isSpeaking = false;
+                        
+                        // Ripristina tutti i pulsanti
+                        document.querySelectorAll('.speak-btn').forEach(btn => {
+                            btn.classList.remove('speaking');
+                            btn.innerHTML = '<span>🔊</span>Ascolta';
+                        });
+                        return;
+                    }
+                    
+                    const phrase = this.currentPhrases[phraseIndex];
+                    if (!phrase || !phrase.temporalAnalysis) {
+                        this.logger.log('Frase non trovata o analisi temporale mancante', 'error');
+                        return;
+                    }
+                    
+                    const sampleText = this.generateSampleText(phrase.temporalAnalysis.trend, phrase.duration);
+                    this.speakText(sampleText, phraseIndex);
+                } catch (error) {
+                    this.logger.log(`Errore speakPhrase: ${error.message}`, 'error');
+                }
+            }
+            
+            speakAllPhrases() {
+                if (this.isSpeaking) {
+                    this.speechSynth.cancel();
+                    this.isSpeaking = false;
+                    document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
+                    return;
+                }
+                
+                this.isSpeaking = true;
+                document.getElementById('speakAllPhrases').innerHTML = '<span>⏹️</span>Ferma Lettura';
+                
+                let currentIndex = 0;
+                const speakNext = () => {
+                    if (currentIndex >= this.currentPhrases.length || !this.isSpeaking) {
+                        this.isSpeaking = false;
+                        document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
+                        return;
+                    }
+                    
+                    const phrase = this.currentPhrases[currentIndex];
+                    const sampleText = this.generateSampleText(phrase.temporalAnalysis.trend, phrase.duration);
+                    
+                    const utterance = new SpeechSynthesisUtterance(sampleText);
+                    this.configureSpeech(utterance);
+                    
+                    utterance.onend = () => {
+                        currentIndex++;
+                        setTimeout(speakNext, 500); // Pausa tra le frasi
+                    };
+                    
+                    this.speechSynth.speak(utterance);
+                    this.logger.log(`TTS: "${sampleText}" (Frase ${currentIndex + 1})`);
+                };
+                
+                speakNext();
+            }
+            
+            speakText(text, phraseIndex = null) {
+                try {
+                    if (!this.speechSynth) {
+                        this.logger.log('Speech Synthesis non disponibile', 'error');
+                        return;
+                    }
+                    
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    this.configureSpeech(utterance);
+                    
+                    this.isSpeaking = true;
+                    
+                    // Aggiorna UI del bottone se è una frase specifica
+                    if (phraseIndex !== null) {
+                        const buttons = document.querySelectorAll(`[data-phrase-index="${phraseIndex}"]`);
+                        if (buttons.length > 0) {
+                            buttons[0].classList.add('speaking');
+                            buttons[0].innerHTML = '<span>⏹️</span>Stop';
+                        }
+                    }
+                    
+                    utterance.onend = () => {
+                        this.isSpeaking = false;
+                        
+                        if (phraseIndex !== null) {
+                            const buttons = document.querySelectorAll(`[data-phrase-index="${phraseIndex}"]`);
+                            if (buttons.length > 0) {
+                                buttons[0].classList.remove('speaking');
+                                buttons[0].innerHTML = '<span>🔊</span>Ascolta';
+                            }
+                        }
+                    };
+                    
+                    utterance.onerror = (event) => {
+                        this.isSpeaking = false;
+                        
+                        if (phraseIndex !== null) {
+                            const buttons = document.querySelectorAll(`[data-phrase-index="${phraseIndex}"]`);
+                            if (buttons.length > 0) {
+                                buttons[0].classList.remove('speaking');
+                                buttons[0].innerHTML = '<span>🔊</span>Ascolta';
+                            }
+                        }
+                        
+                        this.logger.log(`Errore TTS: ${event.error}`, 'error');
+                    };
+                    
+                    this.speechSynth.speak(utterance);
+                    this.logger.log(`TTS: "${text}"`);
+                    
+                } catch (error) {
+                    this.logger.log(`Errore speakText: ${error.message}`, 'error');
+                    this.isSpeaking = false;
+                }
+            }
+            
+            configureSpeech(utterance) {
+                try {
+                    const rateElement = document.getElementById('speechRate');
+                    const pitchElement = document.getElementById('speechPitch');
+                    const volumeElement = document.getElementById('speechVolume');
+                    const voiceElement = document.getElementById('speechVoice');
+                    
+                    const rate = rateElement ? parseFloat(rateElement.value) : 1;
+                    const pitch = pitchElement ? parseFloat(pitchElement.value) : 1;
+                    const volume = volumeElement ? parseFloat(volumeElement.value) : 0.8;
+                    const voiceIndex = voiceElement ? voiceElement.value : '';
+                    
+                    utterance.rate = rate;
+                    utterance.pitch = pitch;
+                    utterance.volume = volume;
+                    
+                    if (voiceIndex && this.availableVoices && this.availableVoices[voiceIndex]) {
+                        utterance.voice = this.availableVoices[voiceIndex];
+                    }
+                } catch (error) {
+                    this.logger.log(`Errore configurazione speech: ${error.message}`, 'error');
+                }
             }
             
             createVolumeTrendChart(phrases) {
@@ -1487,10 +1794,10 @@
                 
                 const datasets = [];
                 const voiceColors = {
-                    ascending: '#00b894',   // Verde per crescente (ARIA)
-                    descending: '#74b9ff',  // Blu per calante (ACQUA)
-                    stable: '#fdcb6e',      // Giallo per stabile (TERRA)
-                    dynamic: '#fd79a8'      // Rosa per dinamico (FUOCO)
+                    ascending: '#4682B4',   // Blu cielo per ARIA
+                    descending: '#008B8B',  // Teal per ACQUA  
+                    stable: '#8B4513',      // Marrone per TERRA
+                    dynamic: '#DC143C'      // Rosso cremisi per FUOCO
                 };
                 
                 let globalTime = 0;
@@ -1580,10 +1887,10 @@
                     if (!phrase.temporalAnalysis) return null;
                     
                     const voiceColors = {
-                        ascending: { bg: 'rgba(0, 184, 148, 0.2)', border: '#00b894' },
-                        descending: { bg: 'rgba(116, 185, 255, 0.2)', border: '#74b9ff' },
-                        stable: { bg: 'rgba(253, 203, 110, 0.2)', border: '#fdcb6e' },
-                        dynamic: { bg: 'rgba(253, 121, 168, 0.2)', border: '#fd79a8' }
+                        ascending: { bg: 'rgba(70, 130, 180, 0.2)', border: '#4682B4' },     // Blu cielo
+                        descending: { bg: 'rgba(0, 139, 139, 0.2)', border: '#008B8B' },     // Teal
+                        stable: { bg: 'rgba(139, 69, 19, 0.2)', border: '#8B4513' },         // Marrone
+                        dynamic: { bg: 'rgba(220, 20, 60, 0.2)', border: '#DC143C' }        // Rosso cremisi
                     };
                     
                     const colors = voiceColors[phrase.temporalAnalysis.trend];
@@ -1691,10 +1998,36 @@
                 document.getElementById('autoDetectionResult').style.display = 'none';
                 document.getElementById('analyzePhrases').disabled = true;
                 document.getElementById('autoDetectVoice').disabled = true;
+                document.getElementById('speakAllPhrases').disabled = true;
                 document.getElementById('recordingTime').textContent = '00:00';
+                
+                // Ferma eventuali speech in corso
+                if (this.isSpeaking) {
+                    this.speechSynth.cancel();
+                    this.isSpeaking = false;
+                }
                 
                 this.currentAudioData = null;
                 this.currentAudioDuration = null;
+                this.currentPhrases = [];
+                
+                if (this.volumeTrendChart) {
+                    this.volumeTrendChart.destroy();
+                    this.volumeTrendChart = null;
+                }
+                
+                if (this.individualPhrasesChart) {
+                    this.individualPhrasesChart.destroy();
+                    this.individualPhrasesChart = null;
+                }
+                
+                document.querySelectorAll('.audio-bar').forEach(bar => {
+                    bar.style.height = '0%';
+                });
+                
+                this.logger.clear();
+                this.logger.log('Risultati puliti', 'success');
+            }
                 
                 if (this.volumeTrendChart) {
                     this.volumeTrendChart.destroy();
@@ -1755,8 +2088,12 @@
             }
         }
 
-        // === INIZIALIZZAZIONE APP ===
-        const app = new PhraseAnalysisApp();
+        // Inizializzazione dell'app - rende l'istanza globalmente accessibile
+        let voiceBreakApp;
+        document.addEventListener('DOMContentLoaded', () => {
+            voiceBreakApp = new PhraseAnalysisApp();
+            window.voiceBreakApp = voiceBreakApp; // Rende accessibile globalmente per debug
+        });
     </script>
 </body>
 </html>
