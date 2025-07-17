@@ -1793,12 +1793,18 @@
                 }
                 
                 const datasets = [];
-                const voiceColors = {
-                    ascending: '#4682B4',   // Blu cielo per ARIA
-                    descending: '#008B8B',  // Teal per ACQUA  
-                    stable: '#8B4513',      // Marrone per TERRA
-                    dynamic: '#DC143C'      // Rosso cremisi per FUOCO
-                };
+                
+                // Colori distinti per ogni frase
+                const phraseColors = [
+                    '#4682B4',  // Blu acciaio per Frase 1
+                    '#008B8B',  // Teal scuro per Frase 2
+                    '#8B4513',  // Marrone sella per Frase 3
+                    '#DC143C',  // Rosso cremisi per Frase 4
+                    '#9370DB',  // Viola medio per Frase 5
+                    '#FF8C00',  // Arancione scuro per Frase 6
+                    '#32CD32',  // Verde lime per Frase 7
+                    '#FF1493'   // Rosa profondo per Frase 8
+                ];
                 
                 let globalTime = 0;
                 
@@ -1806,6 +1812,7 @@
                     if (!phrase.temporalAnalysis) return;
                     
                     const globalTimeData = phrase.temporalAnalysis.timeData.map(t => globalTime + t);
+                    const color = phraseColors[index % phraseColors.length];
                     
                     datasets.push({
                         label: `Frase ${phrase.index + 1} (${phrase.temporalAnalysis.trend})`,
@@ -1813,8 +1820,8 @@
                             x: globalTimeData[i],
                             y: volume
                         })),
-                        borderColor: voiceColors[phrase.temporalAnalysis.trend],
-                        backgroundColor: voiceColors[phrase.temporalAnalysis.trend],
+                        borderColor: color,
+                        backgroundColor: color,
                         borderWidth: 3,
                         fill: false,
                         tension: 0.3,
@@ -1883,17 +1890,22 @@
                     this.individualPhrasesChart.destroy();
                 }
                 
+                // Colori distinti per ogni frase con sfumature
+                const phraseColorSets = [
+                    { bg: 'rgba(70, 130, 180, 0.3)', border: '#4682B4' },      // Blu acciaio
+                    { bg: 'rgba(0, 139, 139, 0.3)', border: '#008B8B' },       // Teal scuro
+                    { bg: 'rgba(139, 69, 19, 0.3)', border: '#8B4513' },       // Marrone sella
+                    { bg: 'rgba(220, 20, 60, 0.3)', border: '#DC143C' },       // Rosso cremisi
+                    { bg: 'rgba(147, 112, 219, 0.3)', border: '#9370DB' },     // Viola medio
+                    { bg: 'rgba(255, 140, 0, 0.3)', border: '#FF8C00' },       // Arancione scuro
+                    { bg: 'rgba(50, 205, 50, 0.3)', border: '#32CD32' },       // Verde lime
+                    { bg: 'rgba(255, 20, 147, 0.3)', border: '#FF1493' }       // Rosa profondo
+                ];
+                
                 const datasets = phrases.map((phrase, index) => {
                     if (!phrase.temporalAnalysis) return null;
                     
-                    const voiceColors = {
-                        ascending: { bg: 'rgba(70, 130, 180, 0.2)', border: '#4682B4' },     // Blu cielo
-                        descending: { bg: 'rgba(0, 139, 139, 0.2)', border: '#008B8B' },     // Teal
-                        stable: { bg: 'rgba(139, 69, 19, 0.2)', border: '#8B4513' },         // Marrone
-                        dynamic: { bg: 'rgba(220, 20, 60, 0.2)', border: '#DC143C' }        // Rosso cremisi
-                    };
-                    
-                    const colors = voiceColors[phrase.temporalAnalysis.trend];
+                    const colors = phraseColorSets[index % phraseColorSets.length];
                     
                     return {
                         label: `Frase ${phrase.index + 1}`,
