@@ -630,7 +630,11 @@
             mediaRecorder: null,
             recordingChunks: [],
             recordingStartTime: null,
-            recordingTimer: null
+            recordingTimer: null,
+            // 🆕 Speech Recognition
+            speechRecognition: null,
+            recognizedPhrases: [],
+            isRecognitionEnabled: false
         };
 
         // === FUNZIONI UTILITY ===
@@ -863,7 +867,7 @@
             return mergeTooShortPhrases(phrases);
         }
 
-        // 🆕 Crea una frase da un segmento audio
+        // 🆕 Crea una frase da un segmento audio con testo riconosciuto
         function createPhraseFromSegment(audioBuffer, startTime, endTime, index, sampleRate) {
             const startSample = Math.floor(startTime * sampleRate);
             const endSample = Math.floor(endTime * sampleRate);
@@ -873,6 +877,9 @@
             const trend = analyzeTrendInSegment(segment);
             const avgVolume = calculateAverageVolume(segment);
             const volumeData = createVolumeProfile(segment, 20);
+            
+            // 🆕 Trova il testo corrispondente a questo segmento temporale
+            const recognizedText = findRecognizedTextForSegment(startTime, endTime);
             
             return {
                 index: index,
@@ -891,9 +898,51 @@
                     pitch: 150 + Math.random() * 100, // Placeholder
                     spectralEnergy: Math.random() * 0.8
                 },
-                recognizedText: null,
-                confidence: 0.8 + Math.random() * 0.2
+                recognizedText: recognizedText, // 🆕 Testo reale se disponibile
+                confidence: recognizedText ? 0.9 : 0.6 // Più fiducia se abbiamo testo reale
             };
+        }
+
+        // 🆕 Trova il testo riconosciuto per un segmento temporale
+        function findRecognizedTextForSegment(startTime, endTime) {
+            if (!app.recognizedPhrases || app.recognizedPhrases.length === 0) {
+                return null;
+            }
+            
+            // Cerca frasi che cadono in questo intervallo temporale
+            const segmentStart = startTime * 1000; // Converti in ms
+            const segmentEnd = endTime * 1000;
+            
+            const matchingPhrases = app.recognizedPhrases.filter(phrase => {
+                return phrase.timestamp >= segmentStart && phrase.timestamp <= segmentEnd;
+            });
+            
+            if (matchingPhrases.length > 0) {
+                // Combina tutte le frasi in questo segmento
+                return matchingPhrases.map(p => p.text).join(' ').trim();
+            }
+            
+            // Se nessuna corrispondenza esatta, prova a trovare la più vicina
+            const closest = app.recognizedPhrases.reduce((closest, phrase) => {
+                const currentDistance = Math.min(
+                    Math.abs(phrase.timestamp - segmentStart),
+                    Math.abs(phrase.timestamp - segmentEnd)
+                );
+                const closestDistance = Math.min(
+                    Math.abs(closest.timestamp - segmentStart),
+                    Math.abs(closest.timestamp - segmentEnd)
+                );
+                
+                return currentDistance < closestDistance ? phrase : closest;
+            }, app.recognizedPhrases[0]);
+            
+            // Solo se molto vicina (entro 2 secondi)
+            const distance = Math.min(
+                Math.abs(closest.timestamp - segmentStart),
+                Math.abs(closest.timestamp - segmentEnd)
+            );
+            
+            return distance < 2000 ? closest.text : null;
         }
 
         // 🆕 Analizza il trend di volume in un segmento
@@ -1439,9 +1488,14 @@
             })
                 .then(stream => {
                     app.recordingChunks = [];
+                    app.recognizedPhrases = []; // Reset frasi riconosciute
+                    
                     app.mediaRecorder = new MediaRecorder(stream);
                     app.isRecording = true;
                     app.recordingStartTime = Date.now();
+                    
+                    // 🆕 Avvia riconoscimento vocale se supportato
+                    startSpeechRecognition();
                     
                     // Aggiorna timer
                     app.recordingTimer = setInterval(updateRecordingTimer, 100);
@@ -1456,12 +1510,19 @@
                         const audioBlob = new Blob(app.recordingChunks, { type: 'audio/wav' });
                         convertBlobToAudioData(audioBlob);
                         stream.getTracks().forEach(track => track.stop());
+                        stopSpeechRecognition(); // Ferma riconoscimento
                     };
                     
                     app.mediaRecorder.start(100); // Raccoglie dati ogni 100ms
                     
                     log('Registrazione avviata', 'success');
-                    showMessage('Registrazione in corso... Parla chiaramente!');
+                    
+                    // 🆕 Messaggio differenziato in base al supporto Speech Recognition
+                    if (app.isRecognitionEnabled) {
+                        showMessage('Registrazione + Riconoscimento vocale attivi... Parla chiaramente!');
+                    } else {
+                        showMessage('Registrazione in corso... (Riconoscimento vocale non supportato - analisi solo audio)');
+                    }
                     
                     // Aggiorna UI
                     document.getElementById('startRecording').disabled = true;
@@ -1475,6 +1536,73 @@
                     log(`Errore registrazione: ${error.message}`, 'error');
                     showMessage('Errore durante la registrazione. Controlla i permessi del microfono.', 'error');
                 });
+        }
+
+        // 🆕 Avvia riconoscimento vocale
+        function startSpeechRecognition() {
+            // Controlla supporto Speech Recognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                log('Speech Recognition non supportato in questo browser', 'warning');
+                app.isRecognitionEnabled = false;
+                return;
+            }
+            
+            app.speechRecognition = new SpeechRecognition();
+            app.speechRecognition.continuous = true;
+            app.speechRecognition.interimResults = true;
+            app.speechRecognition.lang = 'it-IT'; // Italiano
+            
+            app.speechRecognition.onstart = () => {
+                app.isRecognitionEnabled = true;
+                log('Riconoscimento vocale avviato', 'success');
+            };
+            
+            app.speechRecognition.onresult = (event) => {
+                let finalTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        finalTranscript += result[0].transcript + ' ';
+                    }
+                }
+                
+                if (finalTranscript.trim()) {
+                    app.recognizedPhrases.push({
+                        text: finalTranscript.trim(),
+                        timestamp: Date.now() - app.recordingStartTime,
+                        confidence: event.results[event.results.length - 1][0].confidence || 0.8
+                    });
+                    
+                    log(`Frase riconosciuta: "${finalTranscript.trim()}"`, 'success');
+                }
+            };
+            
+            app.speechRecognition.onerror = (event) => {
+                log(`Errore riconoscimento vocale: ${event.error}`, 'warning');
+            };
+            
+            app.speechRecognition.onend = () => {
+                app.isRecognitionEnabled = false;
+                log('Riconoscimento vocale terminato');
+            };
+            
+            try {
+                app.speechRecognition.start();
+            } catch (error) {
+                log(`Impossibile avviare riconoscimento vocale: ${error.message}`, 'warning');
+                app.isRecognitionEnabled = false;
+            }
+        }
+
+        // 🆕 Ferma riconoscimento vocale
+        function stopSpeechRecognition() {
+            if (app.speechRecognition && app.isRecognitionEnabled) {
+                app.speechRecognition.stop();
+                log(`Riconoscimento completato. Frasi catturate: ${app.recognizedPhrases.length}`);
+            }
         }
 
         function stopRecording() {
@@ -1504,19 +1632,85 @@
             reader.onload = function(e) {
                 const arrayBuffer = e.target.result;
                 
-                // Per demo, generiamo dati audio simulati
-                const duration = (Date.now() - app.recordingStartTime) / 1000;
-                app.currentAudioData = new Float32Array(44100 * Math.max(1, duration));
-                for (let i = 0; i < app.currentAudioData.length; i++) {
-                    app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
-                }
+                // 🆕 PROCESSAMENTO REALE DELL'AUDIO invece di simulazione
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                document.getElementById('analyzePhrases').disabled = false;
-                document.getElementById('autoDetectVoice').disabled = false;
-                showMessage(`Audio registrato: ${duration.toFixed(1)}s`);
-                log(`Audio processato: ${duration.toFixed(1)}s`, 'success');
+                audioContext.decodeAudioData(arrayBuffer)
+                    .then(audioBuffer => {
+                        // Ottieni il canale audio (mono)
+                        const channelData = audioBuffer.getChannelData(0);
+                        
+                        // Converti in Float32Array per la nostra analisi
+                        app.currentAudioData = new Float32Array(channelData.length);
+                        for (let i = 0; i < channelData.length; i++) {
+                            app.currentAudioData[i] = channelData[i];
+                        }
+                        
+                        const duration = audioBuffer.duration;
+                        
+                        document.getElementById('analyzePhrases').disabled = false;
+                        document.getElementById('autoDetectVoice').disabled = false;
+                        
+                        showMessage(`Audio processato: ${duration.toFixed(1)}s (${channelData.length} campioni)`);
+                        log(`Audio REALE processato: ${duration.toFixed(1)}s, ${channelData.length} campioni`, 'success');
+                    })
+                    .catch(error => {
+                        log(`Errore decodifica audio: ${error.message}`, 'error');
+                        
+                        // Fallback: simulazione migliorata basata sulla durata reale
+                        const duration = (Date.now() - app.recordingStartTime) / 1000;
+                        app.currentAudioData = generateRealisticAudioSimulation(duration);
+                        
+                        document.getElementById('analyzePhrases').disabled = false;
+                        document.getElementById('autoDetectVoice').disabled = false;
+                        
+                        showMessage(`Audio simulato: ${duration.toFixed(1)}s (fallback)`);
+                        log(`Fallback su simulazione audio: ${duration.toFixed(1)}s`, 'warning');
+                    });
             };
             reader.readAsArrayBuffer(blob);
+        }
+
+        // 🆕 Genera simulazione audio più realistica
+        function generateRealisticAudioSimulation(durationSeconds) {
+            const sampleRate = 44100;
+            const totalSamples = Math.floor(durationSeconds * sampleRate);
+            const audioData = new Float32Array(totalSamples);
+            
+            // Simula un discorso con pause naturali
+            const pauseProbability = 0.15; // 15% di possibilità di pausa per ogni 100ms
+            let currentVolume = 0.1;
+            let isInPause = false;
+            let pauseCountdown = 0;
+            
+            for (let i = 0; i < totalSamples; i++) {
+                const timePosition = i / sampleRate;
+                
+                // Ogni 100ms, decidi se iniziare/finire una pausa
+                if (i % (sampleRate / 10) === 0) {
+                    if (!isInPause && Math.random() < pauseProbability) {
+                        isInPause = true;
+                        pauseCountdown = Math.floor(0.3 * sampleRate + Math.random() * 0.8 * sampleRate); // Pause 0.3-1.1s
+                    }
+                }
+                
+                if (isInPause) {
+                    currentVolume = 0.01; // Quasi silenzio
+                    pauseCountdown--;
+                    if (pauseCountdown <= 0) {
+                        isInPause = false;
+                    }
+                } else {
+                    // Volume normale con variazioni naturali
+                    currentVolume = 0.05 + Math.random() * 0.15 + 0.05 * Math.sin(timePosition * 3);
+                }
+                
+                // Genera rumore audio con il volume calcolato
+                audioData[i] = (Math.random() - 0.5) * 2 * currentVolume;
+            }
+            
+            log(`Generata simulazione audio realistica: ${durationSeconds.toFixed(1)}s con pause naturali`);
+            return audioData;
         }
 
         function animateAudioBars() {
