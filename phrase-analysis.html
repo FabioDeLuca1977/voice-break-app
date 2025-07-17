@@ -404,6 +404,41 @@
             margin-top: 20px;
             height: 500px;
             position: relative;
+            overflow: hidden;
+        }
+
+        .chart-scroll-controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 5px;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+        }
+
+        .chart-scroll-controls button {
+            border: none;
+            background: #667eea;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .chart-scroll-controls button:hover {
+            background: #5a6fd8;
+            transform: translateY(-1px);
+        }
+
+        .chart-scroll-controls button:active {
+            transform: translateY(0);
         }
 
         .phrase-overlay {
@@ -416,7 +451,7 @@
             color: #333;
             pointer-events: none;
             z-index: 10;
-            max-width: 180px;
+            max-width: 200px;
             text-align: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             backdrop-filter: blur(5px);
@@ -426,6 +461,25 @@
         .phrase-overlay:hover {
             transform: scale(1.05);
             box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+        }
+
+        /* 🆕 Indicatore di scroll per grafici lunghi */
+        .chart-timeline-indicator {
+            position: absolute;
+            bottom: 45px;
+            left: 20px;
+            right: 20px;
+            height: 4px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 2px;
+            z-index: 15;
+        }
+
+        .chart-timeline-thumb {
+            height: 100%;
+            background: #667eea;
+            border-radius: 2px;
+            transition: all 0.3s ease;
         }
 
         @media (max-width: 768px) {
@@ -1222,6 +1276,15 @@
             // 🆕 Array per memorizzare le annotazioni delle frasi
             const phraseAnnotations = [];
             
+            // 🆕 Calcola la durata totale per dimensionare correttamente il grafico
+            let totalDuration = 0;
+            if (phrases.length > 0) {
+                totalDuration = Math.max(...phrases.map(p => p.endTime || (p.startTime + p.duration)));
+            }
+            
+            // 🆕 Calcola spaziatura dinamica basata sulla durata totale
+            const timeScale = Math.max(1, totalDuration / 10); // Minimo 1 secondo per unità
+            
             phrases.forEach((phrase, index) => {
                 if (!phrase.temporalAnalysis) return;
                 
@@ -1230,42 +1293,46 @@
                 let data;
                 
                 if (chartId === 'volumeTrendChart') {
-                    // Timeline globale
-                    const globalTime = index * 2.5;
+                    // 🆕 Timeline REALE basata su startTime/endTime
+                    const realStartTime = phrase.startTime || (index * 2.5);
+                    const realDuration = phrase.duration;
+                    
                     data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                        x: globalTime + phrase.temporalAnalysis.timeData[i],
+                        x: realStartTime + (i / (phrase.temporalAnalysis.volumeData.length - 1)) * realDuration,
                         y: volume
                     }));
                     
-                    // 🆕 Aggiungi annotazione per la frase
-                    const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
-                    const midTime = globalTime + 1.0; // Punto medio della frase
+                    // 🆕 Aggiungi annotazione per la frase con posizionamento intelligente
+                    const displayText = generateSampleText(phrase.temporalAnalysis.trend, index, phrase.recognizedText);
+                    const midTime = realStartTime + realDuration / 2;
                     const maxVolume = Math.max(...phrase.temporalAnalysis.volumeData);
                     
                     phraseAnnotations.push({
                         type: 'label',
                         xValue: midTime,
-                        yValue: maxVolume + 2, // Leggermente sopra il picco
+                        yValue: maxVolume + 3, // Più spazio sopra
                         backgroundColor: color + '20',
                         borderColor: color,
                         borderWidth: 1,
                         borderRadius: 6,
                         color: '#333',
-                        content: [`Frase ${index + 1}:`, `"${sampleText}"`],
+                        content: [`Frase ${index + 1}:`, `"${displayText.substring(0, 30)}${displayText.length > 30 ? '...' : ''}"`],
                         font: {
-                            size: 10,
+                            size: 9,
                             weight: 'bold'
                         },
-                        padding: 8,
+                        padding: 6,
                         textAlign: 'center',
                         position: 'center'
                     });
                     
                 } else {
-                    // Secondo grafico - stessa logica temporale
-                    const globalTime = index * 2.5;
+                    // Secondo grafico - stessa logica temporale reale
+                    const realStartTime = phrase.startTime || (index * 2.5);
+                    const realDuration = phrase.duration;
+                    
                     data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                        x: globalTime + phrase.temporalAnalysis.timeData[i],
+                        x: realStartTime + (i / (phrase.temporalAnalysis.volumeData.length - 1)) * realDuration,
                         y: volume
                     }));
                 }
@@ -1293,7 +1360,8 @@
                 });
             });
             
-            const chart = new Chart(context, {
+            // 🆕 Configurazione avanzata per scrolling orizzontale
+            const chartConfig = {
                 type: 'line',
                 data: { datasets: datasets },
                 options: {
@@ -1313,20 +1381,24 @@
                                 font: { size: 12 }
                             }
                         },
-                        // 🆕 Plugin per le annotazioni delle frasi
-                        annotation: chartId === 'volumeTrendChart' ? {
-                            annotations: phraseAnnotations
-                        } : undefined,
                         tooltip: {
-                            // 🆕 Tooltip personalizzato che mostra anche la frase
                             callbacks: {
                                 title: function(context) {
-                                    const phraseIndex = Math.floor(context[0].parsed.x / 2.5);
-                                    if (phrases[phraseIndex]) {
-                                        const sampleText = generateSampleText(phrases[phraseIndex].temporalAnalysis.trend);
-                                        return `Frase ${phraseIndex + 1}: "${sampleText}"`;
+                                    const timePoint = context[0].parsed.x;
+                                    const matchingPhrase = phrases.find(p => 
+                                        timePoint >= (p.startTime || 0) && 
+                                        timePoint <= ((p.startTime || 0) + p.duration)
+                                    );
+                                    
+                                    if (matchingPhrase) {
+                                        const displayText = generateSampleText(
+                                            matchingPhrase.temporalAnalysis.trend, 
+                                            matchingPhrase.index, 
+                                            matchingPhrase.recognizedText
+                                        );
+                                        return `Frase ${matchingPhrase.index + 1}: "${displayText}"`;
                                     }
-                                    return 'Tempo: ' + context[0].parsed.x.toFixed(1) + 's';
+                                    return `Tempo: ${timePoint.toFixed(1)}s`;
                                 },
                                 label: function(context) {
                                     return `Volume: ${context.parsed.y.toFixed(1)} dB`;
@@ -1339,26 +1411,51 @@
                             borderWidth: 1,
                             cornerRadius: 8,
                             displayColors: true,
-                            titleFont: {
-                                size: 12,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                size: 11
-                            },
+                            titleFont: { size: 12, weight: 'bold' },
+                            bodyFont: { size: 11 },
                             padding: 12
+                        },
+                        // 🆕 Plugin zoom per scroll orizzontale
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                                threshold: 10
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                    speed: 0.1
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x',
+                                limits: {
+                                    x: {min: 0, max: totalDuration + 2}
+                                }
+                            }
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Tempo (secondi)',
+                                text: 'Tempo (secondi) - Scorri per navigare →',
                                 font: { size: 14, weight: 'bold' }
                             },
                             type: 'linear',
+                            // 🆕 Configurazione per visualizzazione estesa
+                            min: 0,
+                            max: Math.min(totalDuration + 1, 12), // Mostra max 12s inizialmente
                             grid: {
                                 color: 'rgba(0,0,0,0.1)'
+                            },
+                            ticks: {
+                                stepSize: 1, // Tick ogni secondo
+                                callback: function(value) {
+                                    return value.toFixed(0) + 's';
+                                }
                             }
                         },
                         y: {
@@ -1368,7 +1465,7 @@
                                 font: { size: 14, weight: 'bold' }
                             },
                             suggestedMin: -35,
-                            suggestedMax: chartId === 'volumeTrendChart' ? -5 : -5, // Più spazio per le annotazioni nel primo grafico
+                            suggestedMax: chartId === 'volumeTrendChart' ? -5 : -5,
                             grid: {
                                 color: 'rgba(0,0,0,0.1)'
                             }
@@ -1377,13 +1474,22 @@
                     interaction: {
                         intersect: false,
                         mode: 'index'
+                    },
+                    // 🆕 Eventi per gestire scroll con mouse wheel
+                    onHover: (event, elements, chart) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
                     }
                 }
-            });
+            };
             
-            // 🆕 Alternativa alle annotazioni: aggiungi le frasi come overlay manuale
+            const chart = new Chart(context, chartConfig);
+            
+            // 🆕 Aggiungi controlli scroll manuali
+            addScrollControls(chart, chartId, totalDuration);
+            
+            // 🆕 Alternativa alle annotazioni: overlay manuale per frasi
             if (chartId === 'volumeTrendChart') {
-                addPhraseOverlays(chart.canvas, phrases, chart);
+                addPhraseOverlaysExtended(chart.canvas, phrases, chart, totalDuration);
             }
             
             if (chartId === 'volumeTrendChart') {
@@ -1391,6 +1497,124 @@
             } else {
                 app.individualPhrasesChart = chart;
             }
+        }
+
+        // 🆕 Aggiungi controlli scroll ai grafici
+        function addScrollControls(chart, chartId, totalDuration) {
+            const container = chart.canvas.parentElement;
+            
+            // Rimuovi controlli esistenti
+            const existingControls = container.querySelector('.chart-scroll-controls');
+            if (existingControls) existingControls.remove();
+            
+            if (totalDuration <= 12) return; // Non serve scroll se tutto visibile
+            
+            const controls = document.createElement('div');
+            controls.className = 'chart-scroll-controls';
+            controls.style.cssText = `
+                position: absolute;
+                bottom: 10px;
+                right: 10px;
+                background: rgba(255,255,255,0.9);
+                border-radius: 8px;
+                padding: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                display: flex;
+                gap: 5px;
+                z-index: 20;
+            `;
+            
+            const scrollLeft = document.createElement('button');
+            scrollLeft.innerHTML = '⬅️';
+            scrollLeft.style.cssText = 'border: none; background: #667eea; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;';
+            
+            const scrollRight = document.createElement('button');
+            scrollRight.innerHTML = '➡️';
+            scrollRight.style.cssText = 'border: none; background: #667eea; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;';
+            
+            const resetView = document.createElement('button');
+            resetView.innerHTML = '🔄';
+            resetView.style.cssText = 'border: none; background: #6c757d; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;';
+            resetView.title = 'Reset vista';
+            
+            scrollLeft.addEventListener('click', () => {
+                const currentMin = chart.scales.x.min;
+                const newMin = Math.max(0, currentMin - 5);
+                chart.scales.x.options.min = newMin;
+                chart.scales.x.options.max = newMin + 12;
+                chart.update('none');
+            });
+            
+            scrollRight.addEventListener('click', () => {
+                const currentMax = chart.scales.x.max;
+                const newMax = Math.min(totalDuration + 1, currentMax + 5);
+                chart.scales.x.options.max = newMax;
+                chart.scales.x.options.min = newMax - 12;
+                chart.update('none');
+            });
+            
+            resetView.addEventListener('click', () => {
+                chart.scales.x.options.min = 0;
+                chart.scales.x.options.max = Math.min(totalDuration + 1, 12);
+                chart.update('none');
+            });
+            
+            controls.appendChild(scrollLeft);
+            controls.appendChild(scrollRight);
+            controls.appendChild(resetView);
+            container.appendChild(controls);
+        }
+
+        // 🆕 Overlay frasi esteso per timeline lunghe
+        function addPhraseOverlaysExtended(canvas, phrases, chart, totalDuration) {
+            const container = canvas.parentElement;
+            
+            // Rimuovi overlay esistenti
+            const existingOverlays = container.querySelectorAll('.phrase-overlay');
+            existingOverlays.forEach(overlay => overlay.remove());
+            
+            phrases.forEach((phrase, index) => {
+                const displayText = generateSampleText(phrase.temporalAnalysis.trend, index, phrase.recognizedText);
+                const overlay = document.createElement('div');
+                overlay.className = 'phrase-overlay';
+                
+                // 🆕 Posizionamento dinamico basato su timeline reale
+                const realStartTime = phrase.startTime || (index * 2.5);
+                const containerWidth = container.offsetWidth - 40; // Padding
+                const timelineWidth = totalDuration;
+                const relativePosition = (realStartTime / timelineWidth) * containerWidth;
+                
+                overlay.style.cssText = `
+                    position: absolute;
+                    background: rgba(255,255,255,0.95);
+                    border: 2px solid ${getVoiceColor(phrase.temporalAnalysis.trend)};
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    color: #333;
+                    pointer-events: none;
+                    z-index: 10;
+                    max-width: 200px;
+                    text-align: center;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    top: ${20 + (index % 3) * 65}px;
+                    left: ${Math.min(relativePosition, containerWidth - 200)}px;
+                `;
+                
+                overlay.innerHTML = `
+                    <div style="color: ${getVoiceColor(phrase.temporalAnalysis.trend)}; font-size: 12px; margin-bottom: 4px;">
+                        ${getVoiceEmoji(phrase.temporalAnalysis.trend)} Frase ${index + 1} (${phrase.duration.toFixed(1)}s)
+                    </div>
+                    <div style="font-style: italic; line-height: 1.2;">
+                        "${displayText.substring(0, 35)}${displayText.length > 35 ? '...' : ''}"
+                    </div>
+                    ${phrase.recognizedText ? '' : '<div style="font-size: 9px; color: #999; margin-top: 2px;">⚠️ Simulato</div>'}
+                `;
+                
+                container.style.position = 'relative';
+                container.appendChild(overlay);
+            });
         }
 
         // 🆕 Funzione per aggiungere overlay delle frasi
