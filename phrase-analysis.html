@@ -721,25 +721,32 @@
                 };
             }
             
-            // Simulazione classificazione
+            // 🔧 FIX: Simulazione classificazione COERENTE
             const voices = ['ARIA', 'ACQUA', 'TERRA', 'FUOCO'];
+            const baseScores = {};
+            
+            // Genera punteggi casuali ma realistici
+            voices.forEach(voice => {
+                baseScores[voice] = Math.random() * 100;
+            });
+            
+            // 🎯 Trova la voce con punteggio più alto PRIMA della normalizzazione
+            const detectedVoice = voices.reduce((a, b) => baseScores[a] > baseScores[b] ? a : b);
+            
+            // Normalizza i punteggi mantenendo le proporzioni
+            const total = voices.reduce((sum, voice) => sum + baseScores[voice], 0);
             const scores = {};
-            let total = 0;
-            
             voices.forEach(voice => {
-                scores[voice] = Math.random() * 100;
-                total += scores[voice];
+                scores[voice] = (baseScores[voice] / total) * 100;
             });
             
-            // Normalizza
-            voices.forEach(voice => {
-                scores[voice] = (scores[voice] / total) * 100;
-            });
-            
-            const detectedVoice = voices.reduce((a, b) => scores[a] > scores[b] ? a : b);
+            // La confidence è sempre basata sulla voce dominante
             const confidence = scores[detectedVoice] / 100;
             
             log(`Voce rilevata: ${detectedVoice} (${(confidence * 100).toFixed(1)}%)`, 'success');
+            
+            // 🆕 DEBUG LOG per verificare coerenza
+            log(`Punteggi: ARIA=${scores.ARIA.toFixed(1)}%, ACQUA=${scores.ACQUA.toFixed(1)}%, TERRA=${scores.TERRA.toFixed(1)}%, FUOCO=${scores.FUOCO.toFixed(1)}%`);
             
             return {
                 detectedVoice,
@@ -1087,10 +1094,33 @@
                 
                 app.currentPhrases = phrases;
                 
-                // Aggiorna summary
+                // 🆕 GARANTISCE COERENZA tra auto-detection e summary
+                
+                // Aggiorna auto-detection result per coerenza
+                const autoDetectionDiv = document.getElementById('autoDetectionResult');
+                if (autoDetectionDiv) {
+                    autoDetectionDiv.style.display = 'block';
+                    
+                    const voiceEmojis = { ARIA: '🌬️', ACQUA: '💧', TERRA: '🌍', FUOCO: '🔥' };
+                    document.getElementById('detectedVoice').textContent = 
+                        `${voiceEmojis[classification.detectedVoice]} ${classification.detectedVoice}`;
+                    
+                    document.getElementById('confidenceScore').textContent = 
+                        `Precisione: ${(classification.confidence * 100).toFixed(1)}%`;
+                    
+                    document.getElementById('scoreAria').textContent = `${classification.scores.ARIA.toFixed(1)}%`;
+                    document.getElementById('scoreAcqua').textContent = `${classification.scores.ACQUA.toFixed(1)}%`;
+                    document.getElementById('scoreTerra').textContent = `${classification.scores.TERRA.toFixed(1)}%`;
+                    document.getElementById('scoreFuoco').textContent = `${classification.scores.FUOCO.toFixed(1)}%`;
+                }
+                
+                // Aggiorna summary con STESSA classificazione
                 document.getElementById('phraseResults').style.display = 'block';
                 document.getElementById('totalPhrases').textContent = phrases.length;
+                
+                // 🔥 CONSISTENCY FIX: Usa SEMPRE la stessa voce dominante
                 document.getElementById('dominantVoice').textContent = `🎤 ${classification.detectedVoice}`;
+                
                 document.getElementById('avgPhraseDuration').textContent = 
                     `${(phrases.reduce((sum, p) => sum + p.duration, 0) / phrases.length).toFixed(1)}s`;
                 document.getElementById('overallClarity').textContent = 
@@ -1146,7 +1176,11 @@
                 document.getElementById('speakAllPhrases').disabled = false;
                 
                 showProcessing(false);
-                showMessage(`Analisi completata: ${phrases.length} frasi rilevate`);
+                showMessage(`Analisi completata: ${phrases.length} frasi rilevate. Voce dominante: ${classification.detectedVoice}`);
+                
+                // 🆕 LOG FINALE per debug
+                log(`Analisi completata. Coerenza verificata: Auto-detection e Summary mostrano entrambi ${classification.detectedVoice}`, 'success');
+                
             }, 2000);
         }
 
