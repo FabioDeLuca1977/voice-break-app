@@ -685,39 +685,344 @@
         }
 
         // === FUNZIONI PRINCIPALI ===
-        function generateSampleText(trend) {
+        function generateSampleText(trend, phraseIndex = 0, recognizedText = null) {
+            // 🆕 Se abbiamo il testo riconosciuto, usalo
+            if (recognizedText && recognizedText.trim()) {
+                return recognizedText.trim();
+            }
+            
+            // 🆕 Frasi più generiche che simulano un discorso reale
+            const genericPhrases = [
+                "Oggi mi sento bene",
+                "Penso che sia giusto così", 
+                "La situazione mi sembra chiara",
+                "Vorrei esprimere il mio punto di vista",
+                "Secondo me dovremmo procedere",
+                "È importante considerare questo aspetto",
+                "Mi viene da dire che",
+                "In questo momento provo",
+                "Credo fermamente che",
+                "La mia impressione è",
+                "Quello che voglio dire è",
+                "Mi sembra evidente che"
+            ];
+            
+            // Prova prima con frasi generiche
+            if (phraseIndex < genericPhrases.length) {
+                return genericPhrases[phraseIndex];
+            }
+            
+            // Fallback alle frasi originali basate sul trend
             const samples = {
-                ascending: ["Sono sempre più motivato", "La mia energia cresce", "Vedo nuove possibilità"],
-                descending: ["Ora mi sento più calmo", "La tensione si dissolve", "Trovo la mia pace interiore"],
-                stable: ["Sono centrato e presente", "Mantengo il mio equilibrio", "La stabilità è la mia forza"],
-                dynamic: ["L'energia scorre in me", "Sento il ritmo del cambiamento", "La vita pulsa attraverso di me"]
+                ascending: [
+                    "La mia energia cresce gradualmente",
+                    "Sento sempre più fiducia in me",
+                    "Vedo nuove possibilità che si aprono"
+                ],
+                descending: [
+                    "Ora mi sento più calmo e rilassato",
+                    "La tensione si sta dissolvendo",
+                    "Trovo finalmente la mia pace interiore"
+                ],
+                stable: [
+                    "Sono centrato e presente in questo momento",
+                    "Mantengo il mio equilibrio naturale",
+                    "La stabilità è la mia forza principale"
+                ],
+                dynamic: [
+                    "L'energia scorre liberamente in me",
+                    "Sento il ritmo del cambiamento",
+                    "La vita pulsa attraverso ogni mia parola"
+                ]
             };
             
             const trendSamples = samples[trend] || samples.stable;
-            return trendSamples[Math.floor(Math.random() * trendSamples.length)];
+            return trendSamples[phraseIndex % trendSamples.length];
         }
 
         function detectPhrases(audioBuffer) {
-            log(`Iniziando rilevamento frasi. Buffer length: ${audioBuffer.length}`);
+            log(`Iniziando rilevamento frasi intelligente. Buffer length: ${audioBuffer.length}`);
             
             if (audioBuffer.length === 0) {
                 log('Buffer audio vuoto!', 'error');
                 return [];
             }
             
-            // Simulazione del rilevamento frasi per demo
-            const phrases = [];
-            const numPhrases = Math.min(4, Math.floor(audioBuffer.length / 44100) + 1);
+            const durationInSeconds = audioBuffer.length / 44100;
+            log(`Durata totale audio: ${durationInSeconds.toFixed(1)}s`);
             
+            // 🎯 RILEVAMENTO INTELLIGENTE DELLE FRASI
+            const phrases = detectPhrasesFromAudio(audioBuffer, durationInSeconds);
+            
+            log(`Rilevate ${phrases.length} frasi con durate: ${phrases.map(p => p.duration.toFixed(1) + 's').join(', ')}`);
+            return phrases;
+        }
+
+        // 🆕 ALGORITMO DI RILEVAMENTO FRASI BASATO SU PAUSE E VOLUME
+        function detectPhrasesFromAudio(audioBuffer, totalDuration) {
+            const sampleRate = 44100;
+            const windowSize = 1024; // Finestra di analisi
+            const hopSize = 512;     // Sovrapposizione
+            
+            // 1. Calcola l'energia (volume) in finestre temporali
+            const energyWindows = [];
+            for (let i = 0; i < audioBuffer.length - windowSize; i += hopSize) {
+                let energy = 0;
+                for (let j = 0; j < windowSize; j++) {
+                    energy += Math.pow(audioBuffer[i + j] || 0, 2);
+                }
+                energyWindows.push({
+                    energy: Math.sqrt(energy / windowSize),
+                    timeStart: i / sampleRate,
+                    timeEnd: (i + windowSize) / sampleRate
+                });
+            }
+            
+            // 2. Trova la soglia di silenzio (percentile basso dell'energia)
+            const sortedEnergies = energyWindows.map(w => w.energy).sort((a, b) => a - b);
+            const silenceThreshold = sortedEnergies[Math.floor(sortedEnergies.length * 0.2)] * 2; // 20° percentile * 2
+            
+            log(`Soglia silenzio calcolata: ${silenceThreshold.toFixed(4)}`);
+            
+            // 3. Identifica periodi di silenzio (pause)
+            const silenceRegions = [];
+            let silenceStart = null;
+            
+            for (let i = 0; i < energyWindows.length; i++) {
+                const window = energyWindows[i];
+                
+                if (window.energy < silenceThreshold) {
+                    // Inizio o continuazione del silenzio
+                    if (silenceStart === null) {
+                        silenceStart = window.timeStart;
+                    }
+                } else {
+                    // Fine del silenzio
+                    if (silenceStart !== null) {
+                        const silenceDuration = window.timeStart - silenceStart;
+                        // Solo pause significative (>200ms)
+                        if (silenceDuration > 0.2) {
+                            silenceRegions.push({
+                                start: silenceStart,
+                                end: window.timeStart,
+                                duration: silenceDuration
+                            });
+                        }
+                        silenceStart = null;
+                    }
+                }
+            }
+            
+            log(`Rilevate ${silenceRegions.length} pause: ${silenceRegions.map(s => s.duration.toFixed(2) + 's').join(', ')}`);
+            
+            // 4. Segmenta in frasi usando le pause
+            const phrases = [];
+            let currentPhraseStart = 0;
+            
+            // Filtra solo le pause più significative per evitare oversegmentation
+            const significantPauses = silenceRegions.filter(s => s.duration > 0.4); // >400ms
+            
+            for (let i = 0; i < significantPauses.length; i++) {
+                const pause = significantPauses[i];
+                const phraseEnd = pause.start;
+                const phraseDuration = phraseEnd - currentPhraseStart;
+                
+                // Solo frasi di durata ragionevole (1-12 secondi)
+                if (phraseDuration >= 1.0 && phraseDuration <= 12.0) {
+                    phrases.push(createPhraseFromSegment(
+                        audioBuffer, 
+                        currentPhraseStart, 
+                        phraseEnd, 
+                        phrases.length,
+                        sampleRate
+                    ));
+                }
+                
+                currentPhraseStart = pause.end;
+            }
+            
+            // Aggiungi l'ultima frase se significativa
+            const lastPhraseDuration = totalDuration - currentPhraseStart;
+            if (lastPhraseDuration >= 1.0) {
+                phrases.push(createPhraseFromSegment(
+                    audioBuffer, 
+                    currentPhraseStart, 
+                    totalDuration, 
+                    phrases.length,
+                    sampleRate
+                ));
+            }
+            
+            // 5. Fallback se non troviamo abbastanza pause naturali
+            if (phrases.length === 0) {
+                log('Nessuna pausa naturale trovata, usando segmentazione temporale uniforme', 'warning');
+                return createUniformPhrases(totalDuration);
+            }
+            
+            // 6. Se abbiamo troppe frasi piccole, unisci quelle adiacenti
+            return mergeTooShortPhrases(phrases);
+        }
+
+        // 🆕 Crea una frase da un segmento audio
+        function createPhraseFromSegment(audioBuffer, startTime, endTime, index, sampleRate) {
+            const startSample = Math.floor(startTime * sampleRate);
+            const endSample = Math.floor(endTime * sampleRate);
+            const segment = audioBuffer.slice(startSample, endSample);
+            
+            // Analizza il trend del volume nel segmento
+            const trend = analyzeTrendInSegment(segment);
+            const avgVolume = calculateAverageVolume(segment);
+            const volumeData = createVolumeProfile(segment, 20);
+            
+            return {
+                index: index,
+                duration: endTime - startTime,
+                startTime: startTime,
+                endTime: endTime,
+                temporalAnalysis: {
+                    trend: trend,
+                    volumeChange: volumeData[volumeData.length - 1] - volumeData[0],
+                    avgVolume: avgVolume,
+                    volumeData: volumeData,
+                    timeData: Array.from({length: 20}, (_, i) => i * 0.1)
+                },
+                features: {
+                    avgVolume: avgVolume,
+                    pitch: 150 + Math.random() * 100, // Placeholder
+                    spectralEnergy: Math.random() * 0.8
+                },
+                recognizedText: null,
+                confidence: 0.8 + Math.random() * 0.2
+            };
+        }
+
+        // 🆕 Analizza il trend di volume in un segmento
+        function analyzeTrendInSegment(segment) {
+            if (segment.length < 1000) return 'stable';
+            
+            const quarterSize = Math.floor(segment.length / 4);
+            const firstQuarter = segment.slice(0, quarterSize);
+            const lastQuarter = segment.slice(-quarterSize);
+            
+            const avgFirst = calculateAverageVolume(firstQuarter);
+            const avgLast = calculateAverageVolume(lastQuarter);
+            const difference = avgLast - avgFirst;
+            
+            // Calcola anche la variabilità per rilevare dinamismo
+            const midQuarters = segment.slice(quarterSize, -quarterSize);
+            const variability = calculateVolumeVariability(midQuarters);
+            
+            if (variability > 8) { // Molto variabile
+                return 'dynamic';
+            } else if (difference > 3) { // Crescente
+                return 'ascending';
+            } else if (difference < -3) { // Calante  
+                return 'descending';
+            } else { // Stabile
+                return 'stable';
+            }
+        }
+
+        // 🆕 Calcola volume medio di un segmento
+        function calculateAverageVolume(segment) {
+            if (segment.length === 0) return -30;
+            
+            let sum = 0;
+            for (let i = 0; i < segment.length; i++) {
+                sum += Math.pow(segment[i] || 0, 2);
+            }
+            const rms = Math.sqrt(sum / segment.length);
+            return 20 * Math.log10(rms + 1e-10); // Converti in dB
+        }
+
+        // 🆕 Calcola variabilità del volume
+        function calculateVolumeVariability(segment) {
+            const windowSize = Math.floor(segment.length / 10);
+            const volumes = [];
+            
+            for (let i = 0; i < segment.length - windowSize; i += windowSize) {
+                const window = segment.slice(i, i + windowSize);
+                volumes.push(calculateAverageVolume(window));
+            }
+            
+            const mean = volumes.reduce((sum, v) => sum + v, 0) / volumes.length;
+            const variance = volumes.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / volumes.length;
+            return Math.sqrt(variance);
+        }
+
+        // 🆕 Crea profilo volume per la visualizzazione
+        function createVolumeProfile(segment, numPoints) {
+            const chunkSize = Math.floor(segment.length / numPoints);
+            const profile = [];
+            
+            for (let i = 0; i < numPoints; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, segment.length);
+                const chunk = segment.slice(start, end);
+                profile.push(calculateAverageVolume(chunk));
+            }
+            
+            return profile;
+        }
+
+        // 🆕 Unisci frasi troppo corte
+        function mergeTooShortPhrases(phrases) {
+            const merged = [];
+            let i = 0;
+            
+            while (i < phrases.length) {
+                let currentPhrase = phrases[i];
+                
+                // Se la frase è troppo corta (<2s) e ce n'è un'altra dopo, uniscile
+                while (currentPhrase.duration < 2.0 && i + 1 < phrases.length) {
+                    const nextPhrase = phrases[i + 1];
+                    currentPhrase = mergeAdjacentPhrases(currentPhrase, nextPhrase);
+                    i++;
+                }
+                
+                merged.push(currentPhrase);
+                i++;
+            }
+            
+            return merged;
+        }
+
+        // 🆕 Unisce due frasi adiacenti
+        function mergeAdjacentPhrases(phrase1, phrase2) {
+            const combinedDuration = phrase2.endTime - phrase1.startTime;
+            const combinedVolumeData = [...phrase1.temporalAnalysis.volumeData, ...phrase2.temporalAnalysis.volumeData];
+            
+            return {
+                ...phrase1,
+                duration: combinedDuration,
+                endTime: phrase2.endTime,
+                temporalAnalysis: {
+                    ...phrase1.temporalAnalysis,
+                    trend: phrase1.temporalAnalysis.trend, // Mantieni il trend della prima
+                    volumeData: combinedVolumeData.slice(0, 20), // Mantieni 20 punti
+                    avgVolume: (phrase1.temporalAnalysis.avgVolume + phrase2.temporalAnalysis.avgVolume) / 2
+                }
+            };
+        }
+
+        // 🆕 Fallback: segmentazione uniforme se non si trovano pause
+        function createUniformPhrases(totalDuration) {
+            const targetPhraseDuration = 4.0; // 4 secondi per frase
+            const numPhrases = Math.max(1, Math.floor(totalDuration / targetPhraseDuration));
+            const actualPhraseDuration = totalDuration / numPhrases;
+            
+            const phrases = [];
             for (let i = 0; i < numPhrases; i++) {
-                const trends = ['ascending', 'descending', 'stable', 'dynamic'];
-                const trend = trends[i % trends.length];
+                const startTime = i * actualPhraseDuration;
+                const endTime = Math.min((i + 1) * actualPhraseDuration, totalDuration);
                 
                 phrases.push({
                     index: i,
-                    duration: 1.5 + Math.random() * 2,
+                    duration: endTime - startTime,
+                    startTime: startTime,
+                    endTime: endTime,
                     temporalAnalysis: {
-                        trend: trend,
+                        trend: ['ascending', 'descending', 'stable', 'dynamic'][i % 4],
                         volumeChange: (Math.random() - 0.5) * 10,
                         avgVolume: -30 + Math.random() * 15,
                         volumeData: Array.from({length: 20}, () => -35 + Math.random() * 20),
@@ -727,11 +1032,12 @@
                         avgVolume: -30 + Math.random() * 15,
                         pitch: 150 + Math.random() * 100,
                         spectralEnergy: Math.random() * 0.8
-                    }
+                    },
+                    recognizedText: null,
+                    confidence: 0.6 + Math.random() * 0.3
                 });
             }
             
-            log(`Rilevate ${phrases.length} frasi`);
             return phrases;
         }
 
@@ -1047,7 +1353,8 @@
             existingOverlays.forEach(overlay => overlay.remove());
             
             phrases.forEach((phrase, index) => {
-                const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                // 🆕 Usa il testo appropriato per gli overlay
+                const displayText = generateSampleText(phrase.temporalAnalysis.trend, index, phrase.recognizedText);
                 const overlay = document.createElement('div');
                 overlay.className = 'phrase-overlay';
                 overlay.style.cssText = `
@@ -1061,7 +1368,7 @@
                     color: #333;
                     pointer-events: none;
                     z-index: 10;
-                    max-width: 180px;
+                    max-width: 200px;
                     text-align: center;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
                     top: ${20 + (index * 60)}px;
@@ -1073,8 +1380,9 @@
                         ${getVoiceEmoji(phrase.temporalAnalysis.trend)} Frase ${index + 1}
                     </div>
                     <div style="font-style: italic; line-height: 1.2;">
-                        "${sampleText}"
+                        "${displayText}"
                     </div>
+                    ${phrase.recognizedText ? '' : '<div style="font-size: 9px; color: #999; margin-top: 2px;">⚠️ Simulato</div>'}
                 `;
                 
                 container.style.position = 'relative';
@@ -1333,7 +1641,8 @@
                     const card = document.createElement('div');
                     card.className = `phrase-card trend-${phrase.temporalAnalysis.trend}`;
                     
-                    const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                    // 🆕 Usa il testo riconosciuto se disponibile, altrimenti genera sample
+                    const displayText = generateSampleText(phrase.temporalAnalysis.trend, index, phrase.recognizedText);
                     
                     card.innerHTML = `
                         <div class="phrase-title">Frase ${phrase.index + 1}</div>
@@ -1344,8 +1653,9 @@
                         <div>Cambio: ${phrase.temporalAnalysis.volumeChange > 0 ? '+' : ''}${phrase.temporalAnalysis.volumeChange.toFixed(1)}dB</div>
                         <div>Media: ${phrase.temporalAnalysis.avgVolume.toFixed(1)}dB</div>
                         <div style="margin-top: 8px; font-style: italic; color: #666; font-size: 12px;">
-                            "${sampleText}"
+                            "${displayText}"
                         </div>
+                        ${phrase.recognizedText ? '' : '<div style="font-size: 10px; color: #999; margin-top: 4px;">⚠️ Testo simulato - Speech-to-Text non implementato</div>'}
                         <div class="phrase-controls">
                             <button class="speak-btn" data-phrase-index="${index}">
                                 <span>🔊</span>
@@ -1355,7 +1665,7 @@
                     `;
                     
                     const speakBtn = card.querySelector('.speak-btn');
-                    speakBtn.addEventListener('click', () => speakText(sampleText, index));
+                    speakBtn.addEventListener('click', () => speakText(displayText, index));
                     
                     container.appendChild(card);
                 });
