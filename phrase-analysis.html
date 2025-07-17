@@ -403,6 +403,29 @@
             padding: 20px;
             margin-top: 20px;
             height: 500px;
+            position: relative;
+        }
+
+        .phrase-overlay {
+            position: absolute;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #333;
+            pointer-events: none;
+            z-index: 10;
+            max-width: 180px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .phrase-overlay:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
         }
 
         @media (max-width: 768px) {
@@ -832,39 +855,86 @@
                 app.individualPhrasesChart.destroy();
             }
             
-            const colors = ['#4682B4', '#008B8B', '#8B4513', '#DC143C', '#9370DB', '#FF8C00', '#32CD32', '#FF1493'];
+            // 🎨 COLORI BASATI SUL TIPO DI VOCE
+            const voiceColors = {
+                ascending: '#4682B4',  // ARIA - Blu
+                descending: '#008B8B', // ACQUA - Teal
+                stable: '#8B4513',     // TERRA - Marrone
+                dynamic: '#DC143C'     // FUOCO - Rosso
+            };
+            
             const datasets = [];
+            // 🆕 Array per memorizzare le annotazioni delle frasi
+            const phraseAnnotations = [];
             
             phrases.forEach((phrase, index) => {
                 if (!phrase.temporalAnalysis) return;
                 
-                const color = colors[index % colors.length];
+                // 🎯 Colore basato sul trend/voce
+                const color = voiceColors[phrase.temporalAnalysis.trend];
                 let data;
                 
                 if (chartId === 'volumeTrendChart') {
                     // Timeline globale
-                    const globalTime = index * 2.5; // Spaziatura tra frasi
+                    const globalTime = index * 2.5;
                     data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
                         x: globalTime + phrase.temporalAnalysis.timeData[i],
                         y: volume
                     }));
+                    
+                    // 🆕 Aggiungi annotazione per la frase
+                    const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                    const midTime = globalTime + 1.0; // Punto medio della frase
+                    const maxVolume = Math.max(...phrase.temporalAnalysis.volumeData);
+                    
+                    phraseAnnotations.push({
+                        type: 'label',
+                        xValue: midTime,
+                        yValue: maxVolume + 2, // Leggermente sopra il picco
+                        backgroundColor: color + '20',
+                        borderColor: color,
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        color: '#333',
+                        content: [`Frase ${index + 1}:`, `"${sampleText}"`],
+                        font: {
+                            size: 10,
+                            weight: 'bold'
+                        },
+                        padding: 8,
+                        textAlign: 'center',
+                        position: 'center'
+                    });
+                    
                 } else {
-                    // Confronto normalizzato
+                    // Secondo grafico - stessa logica temporale
+                    const globalTime = index * 2.5;
                     data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                        x: (i / (phrase.temporalAnalysis.volumeData.length - 1)) * 100,
+                        x: globalTime + phrase.temporalAnalysis.timeData[i],
                         y: volume
                     }));
                 }
                 
+                // 🎭 Emoji per identificare le voci
+                const voiceEmojis = {
+                    ascending: '🌬️ Aria',
+                    descending: '💧 Acqua', 
+                    stable: '🌍 Terra',
+                    dynamic: '🔥 Fuoco'
+                };
+                
                 datasets.push({
-                    label: `Frase ${phrase.index + 1}`,
+                    label: `${voiceEmojis[phrase.temporalAnalysis.trend]} - Frase ${phrase.index + 1}`,
                     data: data,
                     borderColor: color,
-                    backgroundColor: chartId === 'individualPhrasesChart' ? color + '30' : color,
+                    backgroundColor: color + '30',
                     borderWidth: 3,
                     fill: chartId === 'individualPhrasesChart',
                     tension: 0.3,
-                    pointRadius: 4
+                    pointRadius: 4,
+                    pointBackgroundColor: color,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2
                 });
             });
             
@@ -878,37 +948,159 @@
                         title: {
                             display: true,
                             text: title,
-                            font: { size: 16 }
+                            font: { size: 16, weight: 'bold' }
                         },
                         legend: {
-                            position: 'top'
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 15,
+                                font: { size: 12 }
+                            }
+                        },
+                        // 🆕 Plugin per le annotazioni delle frasi
+                        annotation: chartId === 'volumeTrendChart' ? {
+                            annotations: phraseAnnotations
+                        } : undefined,
+                        tooltip: {
+                            // 🆕 Tooltip personalizzato che mostra anche la frase
+                            callbacks: {
+                                title: function(context) {
+                                    const phraseIndex = Math.floor(context[0].parsed.x / 2.5);
+                                    if (phrases[phraseIndex]) {
+                                        const sampleText = generateSampleText(phrases[phraseIndex].temporalAnalysis.trend);
+                                        return `Frase ${phraseIndex + 1}: "${sampleText}"`;
+                                    }
+                                    return 'Tempo: ' + context[0].parsed.x.toFixed(1) + 's';
+                                },
+                                label: function(context) {
+                                    return `Volume: ${context.parsed.y.toFixed(1)} dB`;
+                                }
+                            },
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: '#333',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: true,
+                            titleFont: {
+                                size: 12,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 11
+                            },
+                            padding: 12
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: chartId === 'volumeTrendChart' ? 'Tempo (secondi)' : 'Progresso (%)'
+                                text: 'Tempo (secondi)',
+                                font: { size: 14, weight: 'bold' }
                             },
-                            type: 'linear'
+                            type: 'linear',
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Volume (dB)'
+                                text: 'Volume (dB)',
+                                font: { size: 14, weight: 'bold' }
                             },
                             suggestedMin: -35,
-                            suggestedMax: -5
+                            suggestedMax: chartId === 'volumeTrendChart' ? -5 : -5, // Più spazio per le annotazioni nel primo grafico
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
             });
+            
+            // 🆕 Alternativa alle annotazioni: aggiungi le frasi come overlay manuale
+            if (chartId === 'volumeTrendChart') {
+                addPhraseOverlays(chart.canvas, phrases, chart);
+            }
             
             if (chartId === 'volumeTrendChart') {
                 app.volumeTrendChart = chart;
             } else {
                 app.individualPhrasesChart = chart;
             }
+        }
+
+        // 🆕 Funzione per aggiungere overlay delle frasi
+        function addPhraseOverlays(canvas, phrases, chart) {
+            const container = canvas.parentElement;
+            
+            // Rimuovi overlay esistenti
+            const existingOverlays = container.querySelectorAll('.phrase-overlay');
+            existingOverlays.forEach(overlay => overlay.remove());
+            
+            phrases.forEach((phrase, index) => {
+                const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                const overlay = document.createElement('div');
+                overlay.className = 'phrase-overlay';
+                overlay.style.cssText = `
+                    position: absolute;
+                    background: rgba(255,255,255,0.95);
+                    border: 2px solid ${getVoiceColor(phrase.temporalAnalysis.trend)};
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    color: #333;
+                    pointer-events: none;
+                    z-index: 10;
+                    max-width: 180px;
+                    text-align: center;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    top: ${20 + (index * 60)}px;
+                    left: ${50 + (index * 180)}px;
+                `;
+                
+                overlay.innerHTML = `
+                    <div style="color: ${getVoiceColor(phrase.temporalAnalysis.trend)}; font-size: 12px; margin-bottom: 4px;">
+                        ${getVoiceEmoji(phrase.temporalAnalysis.trend)} Frase ${index + 1}
+                    </div>
+                    <div style="font-style: italic; line-height: 1.2;">
+                        "${sampleText}"
+                    </div>
+                `;
+                
+                container.style.position = 'relative';
+                container.appendChild(overlay);
+            });
+        }
+
+        // 🆕 Funzioni helper per colori ed emoji
+        function getVoiceColor(trend) {
+            const colors = {
+                ascending: '#4682B4',
+                descending: '#008B8B',
+                stable: '#8B4513',
+                dynamic: '#DC143C'
+            };
+            return colors[trend] || '#666';
+        }
+
+        function getVoiceEmoji(trend) {
+            const emojis = {
+                ascending: '🌬️',
+                descending: '💧',
+                stable: '🌍',
+                dynamic: '🔥'
+            };
+            return emojis[trend] || '🎤';
         }
 
         // === EVENT HANDLERS ===
@@ -1169,8 +1361,8 @@
                 });
                 
                 // Crea grafici
-                createChart(phrases, 'volumeTrendChart', '📈 Andamento Volume nel Tempo - Tutte le Frasi');
-                createChart(phrases, 'individualPhrasesChart', '🔄 Confronto Andamenti per Frase (Normalizzato 0-100%)');
+                createChart(phrases, 'volumeTrendChart', '📈 Andamento Temporale delle Voci - Timeline Completa');
+                createChart(phrases, 'individualPhrasesChart', '🎭 Sequenza delle Voci nel Tempo - Confronto Diretto');
                 
                 // Abilita TTS per tutte le frasi
                 document.getElementById('speakAllPhrases').disabled = false;
