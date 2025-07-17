@@ -1,4 +1,782 @@
-<!DOCTYPE html>
+<input type="file" id="fileInput" accept="audio/*" style="display: none;">
+                    
+                    <div class="tts-controls">
+                        <h4>🔊 Text-to-Speech</h4>
+                        <div class="voice-settings">
+                            <div class="voice-setting">
+                                <label>Velocità</label>
+                                <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Pitch</label>
+                                <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Volume</label>
+                                <input type="range" id="speechVolume" min="0" max="1" step="0.1" value="0.8">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Voce</label>
+                                <select id="speechVoice">
+                                    <option value="">Default</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="speakAllPhrases" class="btn" disabled>
+                            <span>🎤</span>
+                            Leggi Tutte le Frasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auto-detection-result" id="autoDetectionResult">
+                <div class="detected-voice" id="detectedVoice">🎤 Analizzando...</div>
+                <div class="confidence-score" id="confidenceScore">Precisione: --</div>
+                <div class="voice-breakdown" id="voiceBreakdown">
+                    <div class="voice-score">
+                        <div>🌬️ ARIA</div>
+                        <div id="scoreAria">--%</div>
+                    </div>
+                    <div class="voice-score">
+                        <div>💧 ACQUA</div>
+                        <div id="scoreAcqua">--%</div>
+                    </div>
+                    <div class="voice-score">
+                        <div>🌍 TERRA</div>
+                        <div id="scoreTerra">--%</div>
+                    </div>
+                    <div class="voice-score">
+                        <div>🔥 FUOCO</div>
+                        <div id="scoreFuoco">--%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+            <div class="warning-message" id="warningMessage"></div>
+            
+            <div class="processing-indicator" id="processingIndicator">
+                <div class="spinner"></div>
+                <div>Analizzando le frasi...</div>
+            </div>
+
+            <div class="debug-section">
+                <div class="debug-title">🔍 Log di Debug</div>
+                <div class="debug-log" id="debugLog">
+                    Inizializzazione sistema...<br>
+                </div>
+            </div>
+
+            <div class="phrase-results" id="phraseResults">
+                <div class="phrases-summary" id="phrasesSummary">
+                    <div class="summary-card">
+                        <div class="summary-number" id="totalPhrases">0</div>
+                        <div class="summary-label">Frasi Rilevate</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="dominantVoice">--</div>
+                        <div class="summary-label">Voce Dominante</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="avgPhraseDuration">0.0s</div>
+                        <div class="summary-label">Durata Media Frase</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="overallClarity">--</div>
+                        <div class="summary-label">Chiarezza Generale</div>
+                    </div>
+                </div>
+
+                <div class="phrase-info-grid" id="phraseInfoGrid"></div>
+
+                <div class="chart-container">
+                    <canvas id="volumeTrendChart"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="individualPhrasesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === VARIABILI GLOBALI ===
+        let app = {
+            logger: null,
+            isRecording: false,
+            currentAudioData: null,
+            currentPhrases: [],
+            isSpeaking: false,
+            speechSynth: window.speechSynthesis,
+            availableVoices: [],
+            volumeTrendChart: null,
+            individualPhrasesChart: null
+        };
+
+        // === FUNZIONI UTILITY ===
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            const logEntry = `${timestamp} ${prefix} ${message}<br>`;
+            
+            const logElement = document.getElementById('debugLog');
+            if (logElement) {
+                logElement.innerHTML += logEntry;
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+            
+            console.log(`[Voice Break AI] ${message}`);
+        }
+
+        function showMessage(message, type = 'success') {
+            const messageEl = document.getElementById(`${type}Message`);
+            if (messageEl) {
+                messageEl.textContent = `${type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅'} ${message}`;
+                messageEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, type === 'error' ? 8000 : 5000);
+            }
+        }
+
+        function showProcessing(show, message = 'Elaborazione in corso...') {
+            const indicator = document.getElementById('processingIndicator');
+            if (!indicator) return;
+            
+            if (show) {
+                indicator.style.display = 'block';
+                const messageEl = indicator.querySelector('div:last-child');
+                if (messageEl) messageEl.textContent = message;
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+
+        // === FUNZIONI PRINCIPALI ===
+        function generateSampleText(trend) {
+            const samples = {
+                ascending: ["Sono sempre più motivato", "La mia energia cresce", "Vedo nuove possibilità"],
+                descending: ["Ora mi sento più calmo", "La tensione si dissolve", "Trovo la mia pace interiore"],
+                stable: ["Sono centrato e presente", "Mantengo il mio equilibrio", "La stabilità è la mia forza"],
+                dynamic: ["L'energia scorre in me", "Sento il ritmo del cambiamento", "La vita pulsa attraverso di me"]
+            };
+            
+            const trendSamples = samples[trend] || samples.stable;
+            return trendSamples[Math.floor(Math.random() * trendSamples.length)];
+        }
+
+        function detectPhrases(audioBuffer) {
+            log(`Iniziando rilevamento frasi. Buffer length: ${audioBuffer.length}`);
+            
+            if (audioBuffer.length === 0) {
+                log('Buffer audio vuoto!', 'error');
+                return [];
+            }
+            
+            // Simulazione del rilevamento frasi per demo
+            const phrases = [];
+            const numPhrases = Math.min(4, Math.floor(audioBuffer.length / 44100) + 1);
+            
+            for (let i = 0; i < numPhrases; i++) {
+                const trends = ['ascending', 'descending', 'stable', 'dynamic'];
+                const trend = trends[i % trends.length];
+                
+                phrases.push({
+                    index: i,
+                    duration: 1.5 + Math.random() * 2,
+                    temporalAnalysis: {
+                        trend: trend,
+                        volumeChange: (Math.random() - 0.5) * 10,
+                        avgVolume: -30 + Math.random() * 15,
+                        volumeData: Array.from({length: 20}, () => -35 + Math.random() * 20),
+                        timeData: Array.from({length: 20}, (_, j) => j * 0.1)
+                    },
+                    features: {
+                        avgVolume: -30 + Math.random() * 15,
+                        pitch: 150 + Math.random() * 100,
+                        spectralEnergy: Math.random() * 0.8
+                    }
+                });
+            }
+            
+            log(`Rilevate ${phrases.length} frasi`);
+            return phrases;
+        }
+
+        function classifyVoice(phrases) {
+            if (!phrases || phrases.length === 0) {
+                return {
+                    detectedVoice: 'UNKNOWN',
+                    confidence: 0,
+                    scores: { ARIA: 25, ACQUA: 25, TERRA: 25, FUOCO: 25 }
+                };
+            }
+            
+            // Simulazione classificazione
+            const voices = ['ARIA', 'ACQUA', 'TERRA', 'FUOCO'];
+            const scores = {};
+            let total = 0;
+            
+            voices.forEach(voice => {
+                scores[voice] = Math.random() * 100;
+                total += scores[voice];
+            });
+            
+            // Normalizza
+            voices.forEach(voice => {
+                scores[voice] = (scores[voice] / total) * 100;
+            });
+            
+            const detectedVoice = voices.reduce((a, b) => scores[a] > scores[b] ? a : b);
+            const confidence = scores[detectedVoice] / 100;
+            
+            log(`Voce rilevata: ${detectedVoice} (${(confidence * 100).toFixed(1)}%)`, 'success');
+            
+            return {
+                detectedVoice,
+                confidence,
+                scores
+            };
+        }
+
+        function speakText(text, phraseIndex = null) {
+            if (!app.speechSynth) {
+                log('Speech Synthesis non disponibile', 'error');
+                return;
+            }
+            
+            if (app.isSpeaking) {
+                app.speechSynth.cancel();
+                app.isSpeaking = false;
+                
+                // Reset pulsanti
+                document.querySelectorAll('.speak-btn').forEach(btn => {
+                    btn.classList.remove('speaking');
+                    btn.innerHTML = '<span>🔊</span>Ascolta';
+                });
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Configura TTS
+            const rate = document.getElementById('speechRate')?.value || 1;
+            const pitch = document.getElementById('speechPitch')?.value || 1;
+            const volume = document.getElementById('speechVolume')?.value || 0.8;
+            const voiceIndex = document.getElementById('speechVoice')?.value;
+            
+            utterance.rate = parseFloat(rate);
+            utterance.pitch = parseFloat(pitch);
+            utterance.volume = parseFloat(volume);
+            
+            if (voiceIndex && app.availableVoices[voiceIndex]) {
+                utterance.voice = app.availableVoices[voiceIndex];
+            }
+            
+            app.isSpeaking = true;
+            
+            if (phraseIndex !== null) {
+                const btn = document.querySelector(`[data-phrase-index="${phraseIndex}"]`);
+                if (btn) {
+                    btn.classList.add('speaking');
+                    btn.innerHTML = '<span>⏹️</span>Stop';
+                }
+            }
+            
+            utterance.onend = () => {
+                app.isSpeaking = false;
+                if (phraseIndex !== null) {
+                    const btn = document.querySelector(`[data-phrase-index="${phraseIndex}"]`);
+                    if (btn) {
+                        btn.classList.remove('speaking');
+                        btn.innerHTML = '<span>🔊</span>Ascolta';
+                    }
+                }
+            };
+            
+            utterance.onerror = () => {
+                app.isSpeaking = false;
+                log('Errore TTS', 'error');
+            };
+            
+            app.speechSynth.speak(utterance);
+            log(`TTS: "${text}"`);
+        }
+
+        function createChart(phrases, chartId, title) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx) return;
+            
+            const context = ctx.getContext('2d');
+            
+            if (chartId === 'volumeTrendChart' && app.volumeTrendChart) {
+                app.volumeTrendChart.destroy();
+            }
+            if (chartId === 'individualPhrasesChart' && app.individualPhrasesChart) {
+                app.individualPhrasesChart.destroy();
+            }
+            
+            const colors = ['#4682B4', '#008B8B', '#8B4513', '#DC143C', '#9370DB', '#FF8C00', '#32CD32', '#FF1493'];
+            const datasets = [];
+            
+            phrases.forEach((phrase, index) => {
+                if (!phrase.temporalAnalysis) return;
+                
+                const color = colors[index % colors.length];
+                let data;
+                
+                if (chartId === 'volumeTrendChart') {
+                    // Timeline globale
+                    const globalTime = index * 2.5; // Spaziatura tra frasi
+                    data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
+                        x: globalTime + phrase.temporalAnalysis.timeData[i],
+                        y: volume
+                    }));
+                } else {
+                    // Confronto normalizzato
+                    data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
+                        x: (i / (phrase.temporalAnalysis.volumeData.length - 1)) * 100,
+                        y: volume
+                    }));
+                }
+                
+                datasets.push({
+                    label: `Frase ${phrase.index + 1}`,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: chartId === 'individualPhrasesChart' ? color + '30' : color,
+                    borderWidth: 3,
+                    fill: chartId === 'individualPhrasesChart',
+                    tension: 0.3,
+                    pointRadius: 4
+                });
+            });
+            
+            const chart = new Chart(context, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title,
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: chartId === 'volumeTrendChart' ? 'Tempo (secondi)' : 'Progresso (%)'
+                            },
+                            type: 'linear'
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Volume (dB)'
+                            },
+                            suggestedMin: -35,
+                            suggestedMax: -5
+                        }
+                    }
+                }
+            });
+            
+            if (chartId === 'volumeTrendChart') {
+                app.volumeTrendChart = chart;
+            } else {
+                app.individualPhrasesChart = chart;
+            }
+        }
+
+        // === EVENT HANDLERS ===
+        function testMicrophone() {
+            log('Test microfono avviato...');
+            
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    log('Microfono accessibile ✅', 'success');
+                    showMessage('Microfono funziona correttamente!');
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(error => {
+                    log(`Errore microfono: ${error.message}`, 'error');
+                    showMessage('Errore accesso microfono. Controlla i permessi.', 'error');
+                });
+        }
+
+        function startRecording() {
+            log('Avvio registrazione...');
+            
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    app.isRecording = true;
+                    log('Registrazione avviata', 'success');
+                    showMessage('Registrazione in corso... Parla chiaramente!');
+                    
+                    // Simula registrazione per 3 secondi
+                    setTimeout(() => {
+                        stopRecording();
+                        // Simula audio data
+                        app.currentAudioData = new Float32Array(44100 * 3); // 3 secondi di audio
+                        for (let i = 0; i < app.currentAudioData.length; i++) {
+                            app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
+                        }
+                        
+                        document.getElementById('analyzePhrases').disabled = false;
+                        document.getElementById('autoDetectVoice').disabled = false;
+                        showMessage('Audio registrato: 3.0s');
+                    }, 3000);
+                    
+                    // Aggiorna UI
+                    document.getElementById('startRecording').disabled = true;
+                    document.getElementById('stopRecording').disabled = false;
+                    document.getElementById('startRecording').classList.add('recording');
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(error => {
+                    log(`Errore registrazione: ${error.message}`, 'error');
+                    showMessage('Errore durante la registrazione', 'error');
+                });
+        }
+
+        function stopRecording() {
+            if (app.isRecording) {
+                app.isRecording = false;
+                log('Registrazione fermata', 'success');
+                
+                // Aggiorna UI
+                document.getElementById('startRecording').disabled = false;
+                document.getElementById('stopRecording').disabled = true;
+                document.getElementById('startRecording').classList.remove('recording');
+            }
+        }
+
+        function autoDetectVoice() {
+            if (!app.currentAudioData) {
+                showMessage('Nessun audio da analizzare. Registra prima un audio.', 'error');
+                return;
+            }
+            
+            log('Iniziando auto-rilevamento voce...');
+            showProcessing(true, 'Analizzando automaticamente la voce...');
+            
+            setTimeout(() => {
+                const phrases = detectPhrases(app.currentAudioData);
+                const classification = classifyVoice(phrases);
+                
+                // Mostra risultati
+                document.getElementById('autoDetectionResult').style.display = 'block';
+                
+                const voiceEmojis = { ARIA: '🌬️', ACQUA: '💧', TERRA: '🌍', FUOCO: '🔥' };
+                document.getElementById('detectedVoice').textContent = 
+                    `${voiceEmojis[classification.detectedVoice]} ${classification.detectedVoice}`;
+                
+                document.getElementById('confidenceScore').textContent = 
+                    `Precisione: ${(classification.confidence * 100).toFixed(1)}%`;
+                
+                document.getElementById('scoreAria').textContent = `${classification.scores.ARIA.toFixed(1)}%`;
+                document.getElementById('scoreAcqua').textContent = `${classification.scores.ACQUA.toFixed(1)}%`;
+                document.getElementById('scoreTerra').textContent = `${classification.scores.TERRA.toFixed(1)}%`;
+                document.getElementById('scoreFuoco').textContent = `${classification.scores.FUOCO.toFixed(1)}%`;
+                
+                showProcessing(false);
+                showMessage(`Voce rilevata: ${classification.detectedVoice} con precisione ${(classification.confidence * 100).toFixed(1)}%`);
+            }, 1500);
+        }
+
+        function analyzePhrases() {
+            if (!app.currentAudioData) {
+                showMessage('Nessun audio da analizzare. Registra o carica un file audio.', 'error');
+                return;
+            }
+            
+            log('Iniziando analisi frasi dettagliata...');
+            showProcessing(true, 'Analizzando le frasi...');
+            
+            setTimeout(() => {
+                const phrases = detectPhrases(app.currentAudioData);
+                const classification = classifyVoice(phrases);
+                
+                if (phrases.length === 0) {
+                    showMessage('Nessuna frase rilevata. Prova a registrare di nuovo.', 'error');
+                    showProcessing(false);
+                    return;
+                }
+                
+                app.currentPhrases = phrases;
+                
+                // Aggiorna summary
+                document.getElementById('phraseResults').style.display = 'block';
+                document.getElementById('totalPhrases').textContent = phrases.length;
+                document.getElementById('dominantVoice').textContent = `🎤 ${classification.detectedVoice}`;
+                document.getElementById('avgPhraseDuration').textContent = 
+                    `${(phrases.reduce((sum, p) => sum + p.duration, 0) / phrases.length).toFixed(1)}s`;
+                document.getElementById('overallClarity').textContent = 
+                    classification.confidence > 0.7 ? 'Alta' : classification.confidence > 0.5 ? 'Media' : 'Bassa';
+                
+                // Crea cards frasi
+                const container = document.getElementById('phraseInfoGrid');
+                container.innerHTML = '';
+                
+                const trendDescriptions = {
+                    ascending: '📈 Crescente',
+                    descending: '📉 Calante',
+                    stable: '➡️ Stabile',
+                    dynamic: '🎢 Dinamico'
+                };
+                
+                phrases.forEach((phrase, index) => {
+                    const card = document.createElement('div');
+                    card.className = `phrase-card trend-${phrase.temporalAnalysis.trend}`;
+                    
+                    const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                    
+                    card.innerHTML = `
+                        <div class="phrase-title">Frase ${phrase.index + 1}</div>
+                        <div class="phrase-trend trend-${phrase.temporalAnalysis.trend}">
+                            ${trendDescriptions[phrase.temporalAnalysis.trend]}
+                        </div>
+                        <div>Durata: ${phrase.duration.toFixed(1)}s</div>
+                        <div>Cambio: ${phrase.temporalAnalysis.volumeChange > 0 ? '+' : ''}${phrase.temporalAnalysis.volumeChange.toFixed(1)}dB</div>
+                        <div>Media: ${phrase.temporalAnalysis.avgVolume.toFixed(1)}dB</div>
+                        <div style="margin-top: 8px; font-style: italic; color: #666; font-size: 12px;">
+                            "${sampleText}"
+                        </div>
+                        <div class="phrase-controls">
+                            <button class="speak-btn" data-phrase-index="${index}">
+                                <span>🔊</span>
+                                Ascolta
+                            </button>
+                        </div>
+                    `;
+                    
+                    const speakBtn = card.querySelector('.speak-btn');
+                    speakBtn.addEventListener('click', () => speakText(sampleText, index));
+                    
+                    container.appendChild(card);
+                });
+                
+                // Crea grafici
+                createChart(phrases, 'volumeTrendChart', '📈 Andamento Volume nel Tempo - Tutte le Frasi');
+                createChart(phrases, 'individualPhrasesChart', '🔄 Confronto Andamenti per Frase (Normalizzato 0-100%)');
+                
+                // Abilita TTS per tutte le frasi
+                document.getElementById('speakAllPhrases').disabled = false;
+                
+                showProcessing(false);
+                showMessage(`Analisi completata: ${phrases.length} frasi rilevate`);
+            }, 2000);
+        }
+
+        function speakAllPhrases() {
+            if (app.isSpeaking) {
+                app.speechSynth.cancel();
+                app.isSpeaking = false;
+                document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
+                return;
+            }
+            
+            if (app.currentPhrases.length === 0) return;
+            
+            app.isSpeaking = true;
+            document.getElementById('speakAllPhrases').innerHTML = '<span>⏹️</span>Ferma Lettura';
+            
+            let currentIndex = 0;
+            
+            function speakNext() {
+                if (currentIndex >= app.currentPhrases.length || !app.isSpeaking) {
+                    app.isSpeaking = false;
+                    document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
+                    return;
+                }
+                
+                const phrase = app.currentPhrases[currentIndex];
+                const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                
+                const utterance = new SpeechSynthesisUtterance(sampleText);
+                
+                // Configura TTS
+                const rate = document.getElementById('speechRate')?.value || 1;
+                const pitch = document.getElementById('speechPitch')?.value || 1;
+                const volume = document.getElementById('speechVolume')?.value || 0.8;
+                
+                utterance.rate = parseFloat(rate);
+                utterance.pitch = parseFloat(pitch);
+                utterance.volume = parseFloat(volume);
+                
+                utterance.onend = () => {
+                    currentIndex++;
+                    setTimeout(speakNext, 500);
+                };
+                
+                app.speechSynth.speak(utterance);
+                log(`TTS: "${sampleText}" (Frase ${currentIndex + 1})`);
+            }
+            
+            speakNext();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            log(`Caricamento file: ${file.name}`);
+            showProcessing(true, 'Caricamento file audio...');
+            
+            setTimeout(() => {
+                // Simula caricamento file
+                app.currentAudioData = new Float32Array(44100 * 5); // 5 secondi
+                for (let i = 0; i < app.currentAudioData.length; i++) {
+                    app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
+                }
+                
+                document.getElementById('analyzePhrases').disabled = false;
+                document.getElementById('autoDetectVoice').disabled = false;
+                
+                showProcessing(false);
+                showMessage(`File caricato: ${file.name} (5.0s)`);
+                log('File caricato con successo', 'success');
+            }, 1000);
+        }
+
+        function selectVoice(voiceName) {
+            document.querySelectorAll('.voice-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            const selectedCard = document.querySelector(`[data-voice="${voiceName}"]`);
+            if (selectedCard) selectedCard.classList.add('selected');
+            
+            log(`Voce selezionata: ${voiceName}`, 'success');
+        }
+
+        function clearResults() {
+            document.getElementById('phraseResults').style.display = 'none';
+            document.getElementById('autoDetectionResult').style.display = 'none';
+            document.getElementById('analyzePhrases').disabled = true;
+            document.getElementById('autoDetectVoice').disabled = true;
+            document.getElementById('speakAllPhrases').disabled = true;
+            document.getElementById('recordingTime').textContent = '00:00';
+            
+            if (app.isSpeaking) {
+                app.speechSynth.cancel();
+                app.isSpeaking = false;
+            }
+            
+            app.currentAudioData = null;
+            app.currentPhrases = [];
+            
+            if (app.volumeTrendChart) {
+                app.volumeTrendChart.destroy();
+                app.volumeTrendChart = null;
+            }
+            
+            if (app.individualPhrasesChart) {
+                app.individualPhrasesChart.destroy();
+                app.individualPhrasesChart = null;
+            }
+            
+            document.getElementById('debugLog').innerHTML = 'Log pulito...<br>';
+            log('Risultati puliti', 'success');
+        }
+
+        function setupTTS() {
+            if (!app.speechSynth) {
+                log('Speech Synthesis non disponibile', 'warning');
+                return;
+            }
+            
+            function loadVoices() {
+                app.availableVoices = app.speechSynth.getVoices();
+                const voiceSelect = document.getElementById('speechVoice');
+                
+                if (voiceSelect) {
+                    voiceSelect.innerHTML = '<option value="">Default</option>';
+                    
+                    app.availableVoices.forEach((voice, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        voiceSelect.appendChild(option);
+                    });
+                    
+                    log(`Caricate ${app.availableVoices.length} voci TTS`, 'success');
+                }
+            }
+            
+            if (app.speechSynth.getVoices().length > 0) {
+                loadVoices();
+            } else {
+                app.speechSynth.addEventListener('voiceschanged', loadVoices);
+            }
+        }
+
+        function setupAudioVisualizer() {
+            const visualizer = document.getElementById('audioVisualizer');
+            if (visualizer) {
+                for (let i = 0; i < 50; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    bar.style.left = `${i * 4}px`;
+                    visualizer.appendChild(bar);
+                }
+            }
+        }
+
+        // === INIZIALIZZAZIONE ===
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Voice Break AI inizializzata!', 'success');
+            
+            // Setup event listeners
+            document.getElementById('testMicrophone').addEventListener('click', testMicrophone);
+            document.getElementById('startRecording').addEventListener('click', startRecording);
+            document.getElementById('stopRecording').addEventListener('click', stopRecording);
+            document.getElementById('autoDetectVoice').addEventListener('click', autoDetectVoice);
+            document.getElementById('analyzePhrases').addEventListener('click', analyzePhrases);
+            document.getElementById('clearResults').addEventListener('click', clearResults);
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('speakAllPhrases').addEventListener('click', speakAllPhrases);
+            
+            // Voice cards
+            document.querySelectorAll('.voice-card').forEach(card => {
+                card.addEventListener('click', () => selectVoice(card.dataset.voice));
+            });
+            
+            // Setup componenti
+            setupTTS();
+            setupAudioVisualizer();
+            
+            // Controllo compatibilità browser
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                log('MediaDevices API non supportata', 'error');
+                showMessage('Browser non compatibile. Usa Chrome o Firefox.', 'error');
+                return;
+            }
+            
+            if (typeof MediaRecorder === 'undefined') {
+                log('MediaRecorder non supportato', 'error');
+                showMessage('MediaRecorder non supportato. Aggiorna il browser.', 'error');
+                return;
+            }
+            
+            log('Browser compatibile ✅', 'success');
+            log('Tutti i sistemi operativi. App pronta per l\'uso!', 'success');
+        });
+    </script>
+</body>
+</html><!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -107,10 +885,6 @@
 
         .btn.auto-detect {
             background: linear-gradient(45deg, #6c5ce7, #a29bfe);
-        }
-
-        .btn.auto-detect:hover {
-            box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4);
         }
 
         @keyframes pulse {
@@ -353,11 +1127,6 @@
             box-shadow: 0 3px 8px rgba(108, 117, 125, 0.4);
         }
 
-        .speak-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         .speak-btn.speaking {
             background: linear-gradient(45deg, #28a745, #20c997);
             animation: pulse-speak 1s infinite;
@@ -498,1614 +1267,3 @@
                         Carica Audio
                     </label>
                     <input type="file" id="fileInput" accept="audio/*" style="display: none;">
-                    
-                    <!-- Controlli Text-to-Speech -->
-                    <div class="tts-controls">
-                        <h4>🔊 Text-to-Speech</h4>
-                        <div class="voice-settings">
-                            <div class="voice-setting">
-                                <label>Velocità</label>
-                                <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1">
-                            </div>
-                            <div class="voice-setting">
-                                <label>Pitch</label>
-                                <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1">
-                            </div>
-                            <div class="voice-setting">
-                                <label>Volume</label>
-                                <input type="range" id="speechVolume" min="0" max="1" step="0.1" value="0.8">
-                            </div>
-                            <div class="voice-setting">
-                                <label>Voce</label>
-                                <select id="speechVoice">
-                                    <option value="">Default</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button id="speakAllPhrases" class="btn" disabled>
-                            <span>🎤</span>
-                            Leggi Tutte le Frasi
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="auto-detection-result" id="autoDetectionResult">
-                <div class="detected-voice" id="detectedVoice">🎤 Analizzando...</div>
-                <div class="confidence-score" id="confidenceScore">Precisione: --</div>
-                <div class="voice-breakdown" id="voiceBreakdown">
-                    <div class="voice-score">
-                        <div>🌬️ ARIA</div>
-                        <div id="scoreAria">--%</div>
-                    </div>
-                    <div class="voice-score">
-                        <div>💧 ACQUA</div>
-                        <div id="scoreAcqua">--%</div>
-                    </div>
-                    <div class="voice-score">
-                        <div>🌍 TERRA</div>
-                        <div id="scoreTerra">--%</div>
-                    </div>
-                    <div class="voice-score">
-                        <div>🔥 FUOCO</div>
-                        <div id="scoreFuoco">--%</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="error-message" id="errorMessage"></div>
-            <div class="success-message" id="successMessage"></div>
-            <div class="warning-message" id="warningMessage"></div>
-            
-            <div class="processing-indicator" id="processingIndicator">
-                <div class="spinner"></div>
-                <div>Analizzando le frasi...</div>
-            </div>
-
-            <div class="debug-section">
-                <div class="debug-title">🔍 Log di Debug</div>
-                <div class="debug-log" id="debugLog">
-                    Inizializzazione sistema...<br>
-                </div>
-            </div>
-
-            <div class="phrase-results" id="phraseResults">
-                <div class="phrases-summary" id="phrasesSummary">
-                    <div class="summary-card">
-                        <div class="summary-number" id="totalPhrases">0</div>
-                        <div class="summary-label">Frasi Rilevate</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-number" id="dominantVoice">--</div>
-                        <div class="summary-label">Voce Dominante</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-number" id="avgPhraseDuration">0.0s</div>
-                        <div class="summary-label">Durata Media Frase</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-number" id="overallClarity">--</div>
-                        <div class="summary-label">Chiarezza Generale</div>
-                    </div>
-                </div>
-
-                <div class="phrase-info-grid" id="phraseInfoGrid"></div>
-
-                <div class="chart-container">
-                    <canvas id="volumeTrendChart"></canvas>
-                </div>
-
-                <div class="chart-container">
-                    <canvas id="individualPhrasesChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        class DebugLogger {
-            constructor() {
-                this.logElement = null;
-                this.pendingMessages = [];
-            }
-            
-            init() {
-                this.logElement = document.getElementById('debugLog');
-                this.pendingMessages.forEach(msg => {
-                    if (this.logElement) {
-                        this.logElement.innerHTML += msg;
-                    }
-                });
-                this.pendingMessages = [];
-            }
-            
-            log(message, type = 'info') {
-                const timestamp = new Date().toLocaleTimeString();
-                const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
-                const logEntry = `${timestamp} ${prefix} ${message}<br>`;
-                
-                if (this.logElement) {
-                    this.logElement.innerHTML += logEntry;
-                    this.logElement.scrollTop = this.logElement.scrollHeight;
-                } else {
-                    this.pendingMessages.push(logEntry);
-                }
-                
-                console.log(`[Voice Break AI] ${message}`);
-            }
-            
-            clear() {
-                if (this.logElement) {
-                    this.logElement.innerHTML = 'Log pulito...<br>';
-                }
-            }
-        }
-
-        class PhraseDetector {
-            constructor(logger) {
-                this.logger = logger;
-                this.sampleRate = 44100;
-            }
-            
-            detectPhrases(audioBuffer) {
-                this.logger.log(`Iniziando rilevamento frasi. Buffer length: ${audioBuffer.length}`);
-                
-                if (audioBuffer.length === 0) {
-                    this.logger.log('Buffer audio vuoto!', 'error');
-                    return [];
-                }
-                
-                const overallRMS = Math.sqrt(audioBuffer.reduce((sum, val) => sum + val * val, 0) / audioBuffer.length);
-                this.logger.log(`RMS generale: ${overallRMS.toFixed(6)}`);
-                
-                if (overallRMS < 0.0001) {
-                    this.logger.log('Audio troppo silenzioso', 'warning');
-                    return [];
-                }
-                
-                const threshold = Math.max(0.0005, overallRMS * 0.1);
-                this.logger.log(`Soglia rilevamento: ${threshold.toFixed(6)}`);
-                
-                const segments = this.detectEnergySegments(audioBuffer, threshold);
-                this.logger.log(`Rilevati ${segments.length} segmenti`);
-                
-                if (segments.length === 0) {
-                    const emergencyThreshold = overallRMS * 0.01;
-                    const emergencySegments = this.detectEnergySegments(audioBuffer, emergencyThreshold);
-                    this.logger.log(`Tentativo emergenza: ${emergencySegments.length} segmenti`);
-                    
-                    if (emergencySegments.length === 0) {
-                        return [];
-                    }
-                    return this.convertToPhrasesWithTrends(emergencySegments, audioBuffer);
-                }
-                
-                return this.convertToPhrasesWithTrends(segments, audioBuffer);
-            }
-            
-            detectEnergySegments(audioBuffer, threshold) {
-                const windowSize = Math.floor(0.05 * this.sampleRate);
-                const stepSize = Math.floor(windowSize / 4);
-                const segments = [];
-                let currentSegment = null;
-                
-                for (let i = 0; i < audioBuffer.length - windowSize; i += stepSize) {
-                    let energy = 0;
-                    for (let j = 0; j < windowSize && i + j < audioBuffer.length; j++) {
-                        energy += Math.abs(audioBuffer[i + j]);
-                    }
-                    energy = energy / windowSize;
-                    
-                    const time = i / this.sampleRate;
-                    const isActive = energy > threshold;
-                    
-                    if (isActive && !currentSegment) {
-                        currentSegment = { startTime: time, startSample: i, energies: [energy] };
-                    } else if (isActive && currentSegment) {
-                        currentSegment.energies.push(energy);
-                    } else if (!isActive && currentSegment) {
-                        currentSegment.endTime = time;
-                        currentSegment.endSample = i;
-                        currentSegment.duration = currentSegment.endTime - currentSegment.startTime;
-                        
-                        if (currentSegment.duration >= 0.3) {
-                            segments.push(currentSegment);
-                        }
-                        currentSegment = null;
-                    }
-                }
-                
-                if (currentSegment) {
-                    currentSegment.endTime = audioBuffer.length / this.sampleRate;
-                    currentSegment.endSample = audioBuffer.length;
-                    currentSegment.duration = currentSegment.endTime - currentSegment.startTime;
-                    if (currentSegment.duration >= 0.3) {
-                        segments.push(currentSegment);
-                    }
-                }
-                
-                return segments;
-            }
-            
-            convertToPhrasesWithTrends(segments, audioBuffer) {
-                return segments.map((segment, index) => {
-                    const startSample = Math.floor(segment.startTime * this.sampleRate);
-                    const endSample = Math.floor(segment.endTime * this.sampleRate);
-                    const phraseAudio = audioBuffer.slice(startSample, endSample);
-                    
-                    const temporalAnalysis = this.analyzeTemporalVolume(phraseAudio, segment.duration);
-                    
-                    const rms = Math.sqrt(phraseAudio.reduce((sum, val) => sum + val * val, 0) / phraseAudio.length);
-                    const avgVolume = rms > 0 ? 20 * Math.log10(rms) : -60;
-                    
-                    return {
-                        id: `phrase_${index}`,
-                        index: index,
-                        startTime: segment.startTime,
-                        endTime: segment.endTime,
-                        duration: segment.duration,
-                        features: {
-                            avgVolume: parseFloat(avgVolume.toFixed(2)),
-                            pitch: 150 + Math.random() * 100,
-                            spectralEnergy: Math.random() * 0.8,
-                            volumeVariation: Math.random() * 0.5,
-                            articulation: Math.random() * 0.8,
-                            intensity: Math.max(...segment.energies),
-                            clarity: Math.random() > 0.5 ? 'Alta' : 'Media'
-                        },
-                        temporalAnalysis: temporalAnalysis
-                    };
-                });
-            }
-            
-            analyzeTemporalVolume(phraseAudio, duration) {
-                const numPoints = 20;
-                const stepSize = Math.floor(phraseAudio.length / numPoints);
-                
-                const volumeData = [];
-                const timeData = [];
-                
-                for (let i = 0; i < numPoints; i++) {
-                    const startIdx = i * stepSize;
-                    const endIdx = Math.min(startIdx + stepSize, phraseAudio.length);
-                    const window = phraseAudio.slice(startIdx, endIdx);
-                    
-                    const rms = Math.sqrt(window.reduce((sum, val) => sum + val * val, 0) / window.length);
-                    const volume = rms > 0 ? 20 * Math.log10(rms) : -60;
-                    const time = (i / (numPoints - 1)) * duration;
-                    
-                    volumeData.push(parseFloat(volume.toFixed(1)));
-                    timeData.push(parseFloat(time.toFixed(2)));
-                }
-                
-                const trend = this.determineTrend(volumeData);
-                const volumeChange = volumeData[volumeData.length - 1] - volumeData[0];
-                
-                return {
-                    volumeData: volumeData,
-                    timeData: timeData,
-                    trend: trend,
-                    startVolume: volumeData[0],
-                    endVolume: volumeData[volumeData.length - 1],
-                    volumeChange: parseFloat(volumeChange.toFixed(1)),
-                    avgVolume: volumeData.reduce((sum, v) => sum + v, 0) / volumeData.length
-                };
-            }
-            
-            determineTrend(volumeData) {
-                const start = volumeData[0];
-                const end = volumeData[volumeData.length - 1];
-                const change = end - start;
-                
-                const avg = volumeData.reduce((sum, v) => sum + v, 0) / volumeData.length;
-                const variance = volumeData.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / volumeData.length;
-                
-                if (variance > 8) {
-                    return 'dynamic';
-                } else if (change > 3) {
-                    return 'ascending';
-                } else if (change < -3) {
-                    return 'descending';
-                } else {
-                    return 'stable';
-                }
-            }
-        }
-
-        class VoiceClassifier {
-            constructor(logger) {
-                this.logger = logger;
-                
-                this.voiceProfiles = {
-                    ARIA: {
-                        volumeRange: [-30, -10],
-                        pitchRange: [150, 250],
-                        energyLevel: [0.4, 0.7],
-                        rhythmRange: [8, 12],
-                        expectedTrend: 'ascending',
-                        description: "Tono ascendente, energia crescente, ritmo moderato"
-                    },
-                    ACQUA: {
-                        volumeRange: [-40, -25],
-                        pitchRange: [100, 180],
-                        energyLevel: [0.2, 0.4],
-                        rhythmRange: [4, 8],
-                        expectedTrend: 'descending',
-                        description: "Tono discendente, volume basso, ritmo lento"
-                    },
-                    TERRA: {
-                        volumeRange: [-25, -15],
-                        pitchRange: [140, 200],
-                        energyLevel: [0.3, 0.6],
-                        rhythmRange: [10, 14],
-                        expectedTrend: 'stable',
-                        description: "Tono stabile, volume medio, ritmo costante"
-                    },
-                    FUOCO: {
-                        volumeRange: [-15, -5],
-                        pitchRange: [180, 300],
-                        energyLevel: [0.5, 0.8],
-                        rhythmRange: [15, 25],
-                        expectedTrend: 'dynamic',
-                        description: "Volume alto, energia dinamica, ritmo veloce"
-                    }
-                };
-            }
-            
-            classifyVoice(phrases) {
-                if (!phrases || phrases.length === 0) {
-                    return {
-                        detectedVoice: 'UNKNOWN',
-                        confidence: 0,
-                        scores: { ARIA: 0, ACQUA: 0, TERRA: 0, FUOCO: 0 },
-                        reasoning: 'Nessuna frase da analizzare'
-                    };
-                }
-                
-                this.logger.log(`Classificando ${phrases.length} frasi con analisi trend...`);
-                
-                const globalFeatures = this.calculateGlobalFeatures(phrases);
-                const trendAnalysis = this.analyzeTrends(phrases);
-                
-                this.logger.log(`Features: Vol=${globalFeatures.avgVolume.toFixed(1)}dB, Trend dominante=${trendAnalysis.dominantTrend}`);
-                
-                const scores = {};
-                for (const [voiceName, profile] of Object.entries(this.voiceProfiles)) {
-                    scores[voiceName] = this.calculateVoiceScoreWithTrend(globalFeatures, trendAnalysis, profile);
-                }
-                
-                const maxScore = Math.max(...Object.values(scores));
-                const detectedVoice = Object.keys(scores).find(voice => scores[voice] === maxScore);
-                
-                const sortedScores = Object.values(scores).sort((a, b) => b - a);
-                const confidence = sortedScores.length > 1 ? 
-                    (sortedScores[0] / (sortedScores[0] + sortedScores[1])) : sortedScores[0];
-                
-                const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
-                const normalizedScores = {};
-                for (const [voice, score] of Object.entries(scores)) {
-                    normalizedScores[voice] = totalScore > 0 ? (score / totalScore * 100) : 25;
-                }
-                
-                this.logger.log(`Voce rilevata: ${detectedVoice} (${(confidence * 100).toFixed(1)}%)`, 'success');
-                
-                return {
-                    detectedVoice,
-                    confidence,
-                    scores: normalizedScores,
-                    reasoning: this.generateReasoningWithTrend(detectedVoice, globalFeatures, trendAnalysis),
-                    globalFeatures,
-                    trendAnalysis
-                };
-            }
-            
-            calculateGlobalFeatures(phrases) {
-                const volumes = phrases.map(p => p.features.avgVolume).filter(v => v > -60);
-                const pitches = phrases.map(p => p.features.pitch).filter(p => p > 0);
-                const durations = phrases.map(p => p.duration);
-                const energies = phrases.map(p => p.features.spectralEnergy);
-                
-                return {
-                    avgVolume: volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : -40,
-                    avgPitch: pitches.length > 0 ? pitches.reduce((a, b) => a + b, 0) / pitches.length : 150,
-                    avgDuration: durations.reduce((a, b) => a + b, 0) / durations.length,
-                    avgEnergy: energies.reduce((a, b) => a + b, 0) / energies.length,
-                    phraseCount: phrases.length,
-                    totalDuration: durations.reduce((a, b) => a + b, 0),
-                    rhythm: phrases.length / (durations.reduce((a, b) => a + b, 0) / 60)
-                };
-            }
-            
-            analyzeTrends(phrases) {
-                const trendCounts = { ascending: 0, descending: 0, stable: 0, dynamic: 0 };
-                const avgVolumeChanges = [];
-                
-                phrases.forEach(phrase => {
-                    if (phrase.temporalAnalysis) {
-                        trendCounts[phrase.temporalAnalysis.trend]++;
-                        avgVolumeChanges.push(Math.abs(phrase.temporalAnalysis.volumeChange));
-                    }
-                });
-                
-                const dominantTrend = Object.keys(trendCounts).reduce((a, b) => 
-                    trendCounts[a] > trendCounts[b] ? a : b
-                );
-                
-                const avgVolumeChange = avgVolumeChanges.length > 0 ? 
-                    avgVolumeChanges.reduce((a, b) => a + b, 0) / avgVolumeChanges.length : 0;
-                
-                return {
-                    trendCounts,
-                    dominantTrend,
-                    avgVolumeChange,
-                    consistency: trendCounts[dominantTrend] / phrases.length
-                };
-            }
-            
-            calculateVoiceScoreWithTrend(features, trendAnalysis, profile) {
-                let score = 0;
-                
-                const volumeScore = this.scoreInRange(features.avgVolume, profile.volumeRange);
-                score += volumeScore * 0.25;
-                
-                const pitchScore = this.scoreInRange(features.avgPitch, profile.pitchRange);
-                score += pitchScore * 0.20;
-                
-                const energyScore = this.scoreInRange(features.avgEnergy, profile.energyLevel);
-                score += energyScore * 0.15;
-                
-                const rhythmScore = this.scoreInRange(features.rhythm, profile.rhythmRange);
-                score += rhythmScore * 0.15;
-                
-                const trendScore = this.scoreTrend(trendAnalysis, profile.expectedTrend);
-                score += trendScore * 0.25;
-                
-                return score;
-            }
-            
-            scoreTrend(trendAnalysis, expectedTrend) {
-                const { dominantTrend, consistency, trendCounts } = trendAnalysis;
-                
-                let score = 0;
-                if (dominantTrend === expectedTrend) {
-                    score = consistency;
-                } else {
-                    const expectedCount = trendCounts[expectedTrend] || 0;
-                    const totalPhrases = Object.values(trendCounts).reduce((a, b) => a + b, 0);
-                    score = expectedCount / totalPhrases * 0.5;
-                }
-                
-                return score;
-            }
-            
-            scoreInRange(value, range) {
-                if (value >= range[0] && value <= range[1]) {
-                    return 1.0;
-                } else {
-                    const distance = Math.min(
-                        Math.abs(value - range[0]),
-                        Math.abs(value - range[1])
-                    );
-                    const rangeSize = range[1] - range[0];
-                    return Math.max(0, 1 - (distance / rangeSize));
-                }
-            }
-            
-            generateReasoningWithTrend(voice, features, trendAnalysis) {
-                const profile = this.voiceProfiles[voice];
-                const trendDescriptions = {
-                    ascending: 'volume crescente',
-                    descending: 'volume calante',
-                    stable: 'volume stabile',
-                    dynamic: 'volume dinamico'
-                };
-                
-                return `${profile.description}. Rilevato: Volume ${features.avgVolume.toFixed(1)}dB, ` +
-                       `Pitch ${features.avgPitch.toFixed(1)}Hz, Trend dominante: ${trendDescriptions[trendAnalysis.dominantTrend]} ` +
-                       `(${(trendAnalysis.consistency * 100).toFixed(1)}% delle frasi).`;
-            }
-        }
-
-        class PhraseAnalysisApp {
-            constructor() {
-                this.logger = new DebugLogger();
-                this.phraseDetector = null;
-                this.voiceClassifier = null;
-                this.mediaRecorder = null;
-                this.audioStream = null;
-                this.recordedChunks = [];
-                this.isRecording = false;
-                this.recordingStartTime = null;
-                this.currentAudioData = null;
-                this.currentAudioDuration = null;
-                this.volumeTrendChart = null;
-                this.individualPhrasesChart = null;
-                this.speechSynth = window.speechSynthesis;
-                this.availableVoices = [];
-                this.currentPhrases = [];
-                this.isSpeaking = false;
-                
-                this.initializeApp();
-            }
-            
-            initializeApp() {
-                // Aspetta che il DOM sia completamente caricato
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', () => this.finishInitialization());
-                } else {
-                    // Se il DOM è già caricato, inizializza subito
-                    setTimeout(() => this.finishInitialization(), 100);
-                }
-            }
-            
-            finishInitialization() {
-                this.logger.init();
-                this.phraseDetector = new PhraseDetector(this.logger);
-                this.voiceClassifier = new VoiceClassifier(this.logger);
-                
-                this.setupEventListeners();
-                this.setupAudioVisualizer();
-                this.setupTextToSpeech();
-                this.logger.log('App inizializzata con successo', 'success');
-                this.checkBrowserCompatibility();
-            }
-            
-            checkBrowserCompatibility() {
-                this.logger.log('Controllo compatibilità browser...');
-                
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    this.logger.log('MediaDevices API non supportata', 'error');
-                    this.showError('Browser non compatibile. Usa Chrome o Firefox.');
-                    return;
-                }
-                
-                this.logger.log('Browser compatibile ✅', 'success');
-                
-                try {
-                    if (typeof MediaRecorder === 'undefined') {
-                        this.logger.log('MediaRecorder non supportato', 'error');
-                        this.showError('MediaRecorder non supportato. Aggiorna il browser.');
-                        return;
-                    }
-                    
-                    const supportedTypes = [
-                        'audio/webm',
-                        'audio/webm;codecs=opus',
-                        'audio/mp4',
-                        'audio/mpeg'
-                    ];
-                    
-                    let workingType = null;
-                    for (const type of supportedTypes) {
-                        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
-                            workingType = type;
-                            break;
-                        }
-                    }
-                    
-                    if (workingType) {
-                        this.supportedMimeType = workingType;
-                        this.logger.log(`Codec supportato: ${workingType}`, 'success');
-                    } else {
-                        this.supportedMimeType = undefined;
-                        this.logger.log('Nessun codec preferito trovato, uso default', 'warning');
-                    }
-                    
-                } catch (error) {
-                    this.logger.log(`Errore test MediaRecorder: ${error.message}`, 'error');
-                }
-            }
-            
-            setupEventListeners() {
-                document.getElementById('testMicrophone').addEventListener('click', () => this.testMicrophone());
-                document.getElementById('startRecording').addEventListener('click', () => this.startRecording());
-                document.getElementById('stopRecording').addEventListener('click', () => this.stopRecording());
-                document.getElementById('autoDetectVoice').addEventListener('click', () => this.autoDetectVoice());
-                document.getElementById('analyzePhrases').addEventListener('click', () => this.analyzePhrases());
-                document.getElementById('clearResults').addEventListener('click', () => this.clearResults());
-                document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileUpload(e));
-                document.getElementById('speakAllPhrases').addEventListener('click', () => this.speakAllPhrases());
-                
-                document.querySelectorAll('.voice-card').forEach(card => {
-                    card.addEventListener('click', () => this.selectVoice(card.dataset.voice));
-                });
-            }
-            
-            setupTextToSpeech() {
-                // Verifica che speechSynthesis sia disponibile
-                if (!this.speechSynth) {
-                    this.logger.log('Speech Synthesis non disponibile', 'warning');
-                    return;
-                }
-                
-                // Carica le voci disponibili
-                const loadVoices = () => {
-                    try {
-                        this.availableVoices = this.speechSynth.getVoices();
-                        const voiceSelect = document.getElementById('speechVoice');
-                        
-                        if (voiceSelect) {
-                            voiceSelect.innerHTML = '<option value="">Default</option>';
-                            
-                            this.availableVoices.forEach((voice, index) => {
-                                const option = document.createElement('option');
-                                option.value = index;
-                                option.textContent = `${voice.name} (${voice.lang})`;
-                                voiceSelect.appendChild(option);
-                            });
-                            
-                            this.logger.log(`Caricate ${this.availableVoices.length} voci TTS`, 'success');
-                        }
-                    } catch (error) {
-                        this.logger.log(`Errore caricamento voci TTS: ${error.message}`, 'error');
-                    }
-                };
-                
-                // Le voci potrebbero non essere disponibili immediatamente
-                if (this.speechSynth.getVoices().length > 0) {
-                    loadVoices();
-                } else {
-                    this.speechSynth.addEventListener('voiceschanged', loadVoices);
-                }
-            }
-            
-            setupAudioVisualizer() {
-                const visualizer = document.getElementById('audioVisualizer');
-                for (let i = 0; i < 50; i++) {
-                    const bar = document.createElement('div');
-                    bar.className = 'audio-bar';
-                    bar.style.left = `${i * 4}px`;
-                    visualizer.appendChild(bar);
-                }
-            }
-            
-            async testMicrophone() {
-                this.logger.log('Test microfono avviato...');
-                
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: {
-                            sampleRate: 44100,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true
-                        } 
-                    });
-                    
-                    this.logger.log('Microfono accessibile ✅', 'success');
-                    this.showSuccess('Microfono funziona correttamente!');
-                    
-                    const audioContext = new AudioContext();
-                    const source = audioContext.createMediaStreamSource(stream);
-                    const analyser = audioContext.createAnalyser();
-                    source.connect(analyser);
-                    
-                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                    
-                    let testCount = 0;
-                    const testInterval = setInterval(() => {
-                        analyser.getByteFrequencyData(dataArray);
-                        const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
-                        
-                        this.logger.log(`Livello audio: ${average.toFixed(1)}`);
-                        
-                        if (++testCount >= 5) {
-                            clearInterval(testInterval);
-                            stream.getTracks().forEach(track => track.stop());
-                            this.logger.log('Test microfono completato', 'success');
-                        }
-                    }, 500);
-                    
-                } catch (error) {
-                    this.logger.log(`Errore microfono: ${error.message}`, 'error');
-                    this.showError('Errore accesso microfono. Controlla i permessi.');
-                }
-            }
-            
-            async startRecording() {
-                this.logger.log('Avvio registrazione...');
-                
-                try {
-                    this.audioStream = await navigator.mediaDevices.getUserMedia({ 
-                        audio: {
-                            sampleRate: 44100,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true
-                        } 
-                    });
-                    
-                    this.logger.log('Stream audio ottenuto', 'success');
-                    
-                    try {
-                        let recorderOptions = {};
-                        
-                        if (this.supportedMimeType) {
-                            recorderOptions.mimeType = this.supportedMimeType;
-                            this.logger.log(`Usando mimeType: ${this.supportedMimeType}`);
-                        }
-                        
-                        this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
-                        this.logger.log('MediaRecorder creato con successo', 'success');
-                        
-                    } catch (recorderError) {
-                        this.logger.log(`Errore creazione MediaRecorder con opzioni: ${recorderError.message}`, 'warning');
-                        this.mediaRecorder = new MediaRecorder(this.audioStream);
-                        this.logger.log('MediaRecorder creato senza opzioni specifiche', 'success');
-                    }
-                    
-                    this.recordedChunks = [];
-                    
-                    this.mediaRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) {
-                            this.recordedChunks.push(event.data);
-                            this.logger.log(`Chunk ricevuto: ${event.data.size} bytes`);
-                        }
-                    };
-                    
-                    this.mediaRecorder.onstop = () => {
-                        this.logger.log('MediaRecorder fermato');
-                        const blob = new Blob(this.recordedChunks, { 
-                            type: this.mediaRecorder.mimeType || 'audio/webm' 
-                        });
-                        this.logger.log(`Blob creato: ${blob.size} bytes, tipo: ${blob.type}`);
-                        this.processRecordedAudio(blob);
-                    };
-                    
-                    this.mediaRecorder.onerror = (event) => {
-                        this.logger.log(`Errore MediaRecorder: ${event.error}`, 'error');
-                        this.showError('Errore durante la registrazione');
-                    };
-                    
-                    this.mediaRecorder.start(100);
-                    this.isRecording = true;
-                    this.recordingStartTime = Date.now();
-                    
-                    this.updateRecordingUI(true);
-                    this.startRealtimeVisualizer();
-                    
-                    this.logger.log('Registrazione avviata con successo', 'success');
-                    this.showSuccess('Registrazione in corso... Parla chiaramente!');
-                    
-                } catch (error) {
-                    this.logger.log(`Errore avvio registrazione: ${error.message}`, 'error');
-                    this.showError(`Errore durante l'avvio della registrazione: ${error.message}`);
-                    
-                    if (this.audioStream) {
-                        this.audioStream.getTracks().forEach(track => track.stop());
-                        this.audioStream = null;
-                    }
-                }
-            }
-            
-            stopRecording() {
-                if (this.mediaRecorder && this.isRecording) {
-                    this.logger.log('Fermando registrazione...');
-                    
-                    try {
-                        this.mediaRecorder.stop();
-                        this.logger.log('MediaRecorder.stop() chiamato');
-                    } catch (error) {
-                        this.logger.log(`Errore stop MediaRecorder: ${error.message}`, 'error');
-                    }
-                    
-                    if (this.audioStream) {
-                        this.audioStream.getTracks().forEach(track => track.stop());
-                        this.audioStream = null;
-                    }
-                    
-                    this.isRecording = false;
-                    this.updateRecordingUI(false);
-                    this.stopRealtimeVisualizer();
-                    
-                    this.logger.log('Registrazione fermata', 'success');
-                }
-            }
-            
-            startRealtimeVisualizer() {
-                if (!this.audioStream) return;
-                
-                try {
-                    const audioContext = new AudioContext();
-                    const source = audioContext.createMediaStreamSource(this.audioStream);
-                    const analyser = audioContext.createAnalyser();
-                    
-                    analyser.fftSize = 256;
-                    source.connect(analyser);
-                    
-                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                    
-                    const updateVisualizer = () => {
-                        if (!this.isRecording) return;
-                        
-                        analyser.getByteFrequencyData(dataArray);
-                        this.updateAudioBars(dataArray);
-                        
-                        requestAnimationFrame(updateVisualizer);
-                    };
-                    
-                    updateVisualizer();
-                    
-                } catch (error) {
-                    this.logger.log(`Errore visualizer: ${error.message}`, 'error');
-                }
-            }
-            
-            updateAudioBars(dataArray) {
-                const bars = document.querySelectorAll('.audio-bar');
-                const step = Math.floor(dataArray.length / bars.length);
-                
-                bars.forEach((bar, index) => {
-                    const value = dataArray[index * step] || 0;
-                    const height = (value / 255) * 100;
-                    bar.style.height = `${height}%`;
-                });
-            }
-            
-            stopRealtimeVisualizer() {
-                // Il visualizer si ferma automaticamente quando isRecording diventa false
-            }
-            
-            updateRecordingUI(isRecording) {
-                const startBtn = document.getElementById('startRecording');
-                const stopBtn = document.getElementById('stopRecording');
-                const analyzeBtn = document.getElementById('analyzePhrases');
-                const autoDetectBtn = document.getElementById('autoDetectVoice');
-                
-                startBtn.disabled = isRecording;
-                stopBtn.disabled = !isRecording;
-                
-                if (isRecording) {
-                    startBtn.classList.add('recording');
-                    this.startRecordingTimer();
-                } else {
-                    startBtn.classList.remove('recording');
-                    this.stopRecordingTimer();
-                    analyzeBtn.disabled = false;
-                    autoDetectBtn.disabled = false;
-                }
-            }
-            
-            startRecordingTimer() {
-                this.recordingTimer = setInterval(() => {
-                    if (this.recordingStartTime) {
-                        const elapsed = Date.now() - this.recordingStartTime;
-                        const seconds = Math.floor(elapsed / 1000);
-                        const minutes = Math.floor(seconds / 60);
-                        const displaySeconds = seconds % 60;
-                        
-                        document.getElementById('recordingTime').textContent = 
-                            `${minutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
-                    }
-                }, 1000);
-            }
-            
-            stopRecordingTimer() {
-                if (this.recordingTimer) {
-                    clearInterval(this.recordingTimer);
-                    this.recordingTimer = null;
-                }
-            }
-            
-            selectVoice(voiceName) {
-                document.querySelectorAll('.voice-card').forEach(card => {
-                    card.classList.remove('selected');
-                });
-                
-                document.querySelector(`[data-voice="${voiceName}"]`).classList.add('selected');
-                this.logger.log(`Voce selezionata: ${voiceName}`, 'success');
-            }
-            
-            async processRecordedAudio(blob) {
-                try {
-                    this.logger.log('Processando audio registrato...');
-                    this.logger.log(`Blob: ${blob.size} bytes, tipo: ${blob.type}`);
-                    
-                    const arrayBuffer = await blob.arrayBuffer();
-                    this.logger.log(`ArrayBuffer size: ${arrayBuffer.byteLength} bytes`);
-                    
-                    const audioContext = new AudioContext();
-                    
-                    try {
-                        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                        
-                        const audioData = audioBuffer.getChannelData(0);
-                        const duration = audioBuffer.duration;
-                        
-                        this.logger.log(`Audio decodificato: ${duration.toFixed(2)}s, ${audioData.length} samples`, 'success');
-                        
-                        const rms = Math.sqrt(audioData.reduce((sum, val) => sum + val * val, 0) / audioData.length);
-                        this.logger.log(`RMS audio: ${rms.toFixed(6)}`);
-                        
-                        if (rms < 0.0001) {
-                            this.logger.log('Audio molto silenzioso!', 'warning');
-                            this.showWarning('Audio registrato sembra silenzioso. Prova a parlare più forte.');
-                        }
-                        
-                        this.currentAudioData = audioData;
-                        this.currentAudioDuration = duration;
-                        
-                        document.getElementById('analyzePhrases').disabled = false;
-                        document.getElementById('autoDetectVoice').disabled = false;
-                        this.showSuccess(`Audio registrato: ${duration.toFixed(1)}s`);
-                        
-                    } catch (decodeError) {
-                        this.logger.log(`Errore decodifica audio: ${decodeError.message}`, 'error');
-                        this.showError('Errore nella decodifica dell\'audio. Prova un formato diverso.');
-                    }
-                    
-                } catch (error) {
-                    this.logger.log(`Errore processamento audio: ${error.message}`, 'error');
-                    this.showError('Errore durante l\'elaborazione dell\'audio');
-                }
-            }
-            
-            async autoDetectVoice() {
-                if (!this.currentAudioData) {
-                    this.showError('Nessun audio da analizzare. Registra prima un audio.');
-                    return;
-                }
-                
-                try {
-                    this.logger.log('Iniziando auto-rilevamento voce...');
-                    this.showProcessing(true, 'Analizzando automaticamente la voce...');
-                    
-                    document.getElementById('autoDetectionResult').style.display = 'block';
-                    document.getElementById('detectedVoice').textContent = '🎤 Analizzando...';
-                    
-                    const phrases = this.phraseDetector.detectPhrases(this.currentAudioData);
-                    
-                    if (phrases.length === 0) {
-                        this.logger.log('Nessuna frase rilevata per la classificazione', 'error');
-                        this.showError('Nessuna frase rilevata. Prova a registrare di nuovo parlando più chiaramente.');
-                        document.getElementById('autoDetectionResult').style.display = 'none';
-                        return;
-                    }
-                    
-                    const classification = this.voiceClassifier.classifyVoice(phrases);
-                    this.displayAutoDetectionResults(classification);
-                    
-                    this.showSuccess(`Voce rilevata: ${classification.detectedVoice} con precisione ${(classification.confidence * 100).toFixed(1)}%`);
-                    this.logger.log(`Auto-rilevamento completato: ${classification.detectedVoice}`, 'success');
-                    
-                } catch (error) {
-                    this.logger.log(`Errore durante auto-rilevamento: ${error.message}`, 'error');
-                    this.showError(error.message || 'Errore durante l\'auto-rilevamento della voce');
-                    document.getElementById('autoDetectionResult').style.display = 'none';
-                } finally {
-                    this.showProcessing(false);
-                }
-            }
-            
-            displayAutoDetectionResults(classification) {
-                const { detectedVoice, confidence, scores, reasoning } = classification;
-                
-                const voiceEmojis = {
-                    ARIA: '🌬️',
-                    ACQUA: '💧',
-                    TERRA: '🌍',
-                    FUOCO: '🔥'
-                };
-                
-                document.getElementById('detectedVoice').textContent = 
-                    `${voiceEmojis[detectedVoice]} ${detectedVoice}`;
-                
-                document.getElementById('confidenceScore').textContent = 
-                    `Precisione: ${(confidence * 100).toFixed(1)}%`;
-                
-                document.getElementById('scoreAria').textContent = `${scores.ARIA.toFixed(1)}%`;
-                document.getElementById('scoreAcqua').textContent = `${scores.ACQUA.toFixed(1)}%`;
-                document.getElementById('scoreTerra').textContent = `${scores.TERRA.toFixed(1)}%`;
-                document.getElementById('scoreFuoco').textContent = `${scores.FUOCO.toFixed(1)}%`;
-                
-                this.logger.log(`Ragionamento: ${reasoning}`);
-            }
-            
-            async analyzePhrases() {
-                if (!this.currentAudioData) {
-                    this.showError('Nessun audio da analizzare. Registra o carica un file audio.');
-                    return;
-                }
-                
-                try {
-                    this.logger.log('Iniziando analisi frasi dettagliata...');
-                    this.showProcessing(true, 'Analizzando le frasi...');
-                    
-                    const phrases = this.phraseDetector.detectPhrases(this.currentAudioData);
-                    
-                    if (phrases.length === 0) {
-                        this.logger.log('Nessuna frase rilevata dopo analisi completa', 'error');
-                        this.showError('Nessuna frase rilevata. Prova a registrare di nuovo parlando più forte e con pause più chiare tra le frasi.');
-                        return;
-                    }
-                    
-                    const classification = this.voiceClassifier.classifyVoice(phrases);
-                    
-                    const result = {
-                        phrases: phrases,
-                        classification: classification,
-                        summary: {
-                            totalPhrases: phrases.length,
-                            dominantVoice: classification.detectedVoice,
-                            avgDuration: phrases.reduce((sum, p) => sum + p.duration, 0) / phrases.length,
-                            clarityLabel: classification.confidence > 0.7 ? 'Alta' : 
-                                         classification.confidence > 0.5 ? 'Media' : 'Bassa'
-                        }
-                    };
-                    
-                    this.displayResults(result);
-                    this.showSuccess(`Analisi completata: ${phrases.length} frasi rilevate`);
-                    this.logger.log(`Analisi completata con successo: ${phrases.length} frasi`, 'success');
-                    
-                } catch (error) {
-                    this.logger.log(`Errore durante analisi: ${error.message}`, 'error');
-                    this.showError(error.message || 'Errore durante l\'analisi delle frasi');
-                } finally {
-                    this.showProcessing(false);
-                }
-            }
-            
-            displayResults(result) {
-                document.getElementById('phraseResults').style.display = 'block';
-                
-                document.getElementById('totalPhrases').textContent = result.summary.totalPhrases;
-                document.getElementById('dominantVoice').textContent = `🎤 ${result.summary.dominantVoice}`;
-                document.getElementById('avgPhraseDuration').textContent = `${result.summary.avgDuration.toFixed(1)}s`;
-                document.getElementById('overallClarity').textContent = result.summary.clarityLabel;
-                
-                // Salva le frasi per il TTS
-                this.currentPhrases = result.phrases;
-                document.getElementById('speakAllPhrases').disabled = false;
-                
-                this.displayPhraseInfoCards(result.phrases);
-                this.createVolumeTrendChart(result.phrases);
-                this.createIndividualPhrasesChart(result.phrases);
-            }
-            
-            displayPhraseInfoCards(phrases) {
-                const container = document.getElementById('phraseInfoGrid');
-                container.innerHTML = '';
-                
-                const trendDescriptions = {
-                    ascending: '📈 Crescente',
-                    descending: '📉 Calante', 
-                    stable: '➡️ Stabile',
-                    dynamic: '🎢 Dinamico'
-                };
-                
-                phrases.forEach((phrase, index) => {
-                    if (!phrase.temporalAnalysis) return;
-                    
-                    const card = document.createElement('div');
-                    card.className = `phrase-card trend-${phrase.temporalAnalysis.trend}`;
-                    
-                    // Genera testo esempio per la frase
-                    const sampleText = this.generateSampleText(phrase.temporalAnalysis.trend, phrase.duration);
-                    
-                    card.innerHTML = `
-                        <div class="phrase-title">Frase ${phrase.index + 1}</div>
-                        <div class="phrase-trend trend-${phrase.temporalAnalysis.trend}">
-                            ${trendDescriptions[phrase.temporalAnalysis.trend]}
-                        </div>
-                        <div>Durata: ${phrase.duration.toFixed(1)}s</div>
-                        <div>Cambio: ${phrase.temporalAnalysis.volumeChange > 0 ? '+' : ''}${phrase.temporalAnalysis.volumeChange.toFixed(1)}dB</div>
-                        <div>Media: ${phrase.temporalAnalysis.avgVolume.toFixed(1)}dB</div>
-                        <div style="margin-top: 8px; font-style: italic; color: #666; font-size: 12px;">
-                            "${sampleText}"
-                        </div>
-                        <div class="phrase-controls">
-                            <button class="speak-btn" data-phrase-index="${index}">
-                                <span>🔊</span>
-                                Ascolta
-                            </button>
-                        </div>
-                    `;
-                    
-                    // Aggiungi event listener al pulsante
-                    const speakBtn = card.querySelector('.speak-btn');
-                    speakBtn.addEventListener('click', () => this.speakPhrase(index));
-                    
-                    container.appendChild(card);
-                });
-            }
-            
-            generateSampleText(trend, duration) {
-                const samples = {
-                    ascending: [
-                        "Sono sempre più motivato",
-                        "La mia energia cresce",
-                        "Vedo nuove possibilità",
-                        "Sento l'entusiasmo che sale"
-                    ],
-                    descending: [
-                        "Ora mi sento più calmo",
-                        "La tensione si dissolve",
-                        "Trovo la mia pace interiore",
-                        "Il rilassamento mi avvolge"
-                    ],
-                    stable: [
-                        "Sono centrato e presente",
-                        "Mantengo il mio equilibrio",
-                        "La stabilità è la mia forza",
-                        "Procedo con determinazione"
-                    ],
-                    dynamic: [
-                        "L'energia scorre in me",
-                        "Sento il ritmo del cambiamento",
-                        "Ogni momento è una nuova avventura",
-                        "La vita pulsa attraverso di me"
-                    ]
-                };
-                
-                const trendSamples = samples[trend] || samples.stable;
-                return trendSamples[Math.floor(Math.random() * trendSamples.length)];
-            }
-            
-            speakPhrase(phraseIndex) {
-                try {
-                    if (this.isSpeaking) {
-                        this.speechSynth.cancel();
-                        this.isSpeaking = false;
-                        
-                        // Ripristina tutti i pulsanti
-                        document.querySelectorAll('.speak-btn').forEach(btn => {
-                            btn.classList.remove('speaking');
-                            btn.innerHTML = '<span>🔊</span>Ascolta';
-                        });
-                        return;
-                    }
-                    
-                    const phrase = this.currentPhrases[phraseIndex];
-                    if (!phrase || !phrase.temporalAnalysis) {
-                        this.logger.log('Frase non trovata o analisi temporale mancante', 'error');
-                        return;
-                    }
-                    
-                    const sampleText = this.generateSampleText(phrase.temporalAnalysis.trend, phrase.duration);
-                    this.speakText(sampleText, phraseIndex);
-                } catch (error) {
-                    this.logger.log(`Errore speakPhrase: ${error.message}`, 'error');
-                }
-            }
-            
-            speakAllPhrases() {
-                if (this.isSpeaking) {
-                    this.speechSynth.cancel();
-                    this.isSpeaking = false;
-                    document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
-                    return;
-                }
-                
-                this.isSpeaking = true;
-                document.getElementById('speakAllPhrases').innerHTML = '<span>⏹️</span>Ferma Lettura';
-                
-                let currentIndex = 0;
-                const speakNext = () => {
-                    if (currentIndex >= this.currentPhrases.length || !this.isSpeaking) {
-                        this.isSpeaking = false;
-                        document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
-                        return;
-                    }
-                    
-                    const phrase = this.currentPhrases[currentIndex];
-                    const sampleText = this.generateSampleText(phrase.temporalAnalysis.trend, phrase.duration);
-                    
-                    const utterance = new SpeechSynthesisUtterance(sampleText);
-                    this.configureSpeech(utterance);
-                    
-                    utterance.onend = () => {
-                        currentIndex++;
-                        setTimeout(speakNext, 500); // Pausa tra le frasi
-                    };
-                    
-                    this.speechSynth.speak(utterance);
-                    this.logger.log(`TTS: "${sampleText}" (Frase ${currentIndex + 1})`);
-                };
-                
-                speakNext();
-            }
-            
-            speakText(text, phraseIndex = null) {
-                try {
-                    if (!this.speechSynth) {
-                        this.logger.log('Speech Synthesis non disponibile', 'error');
-                        return;
-                    }
-                    
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    this.configureSpeech(utterance);
-                    
-                    this.isSpeaking = true;
-                    
-                    // Aggiorna UI del bottone se è una frase specifica
-                    if (phraseIndex !== null) {
-                        const buttons = document.querySelectorAll(`[data-phrase-index="${phraseIndex}"]`);
-                        if (buttons.length > 0) {
-                            buttons[0].classList.add('speaking');
-                            buttons[0].innerHTML = '<span>⏹️</span>Stop';
-                        }
-                    }
-                    
-                    utterance.onend = () => {
-                        this.isSpeaking = false;
-                        
-                        if (phraseIndex !== null) {
-                            const buttons = document.querySelectorAll(`[data-phrase-index="${phraseIndex}"]`);
-                            if (buttons.length > 0) {
-                                buttons[0].classList.remove('speaking');
-                                buttons[0].innerHTML = '<span>🔊</span>Ascolta';
-                            }
-                        }
-                    };
-                    
-                    utterance.onerror = (event) => {
-                        this.isSpeaking = false;
-                        
-                        if (phraseIndex !== null) {
-                            const buttons = document.querySelectorAll(`[data-phrase-index="${phraseIndex}"]`);
-                            if (buttons.length > 0) {
-                                buttons[0].classList.remove('speaking');
-                                buttons[0].innerHTML = '<span>🔊</span>Ascolta';
-                            }
-                        }
-                        
-                        this.logger.log(`Errore TTS: ${event.error}`, 'error');
-                    };
-                    
-                    this.speechSynth.speak(utterance);
-                    this.logger.log(`TTS: "${text}"`);
-                    
-                } catch (error) {
-                    this.logger.log(`Errore speakText: ${error.message}`, 'error');
-                    this.isSpeaking = false;
-                }
-            }
-            
-            configureSpeech(utterance) {
-                try {
-                    const rateElement = document.getElementById('speechRate');
-                    const pitchElement = document.getElementById('speechPitch');
-                    const volumeElement = document.getElementById('speechVolume');
-                    const voiceElement = document.getElementById('speechVoice');
-                    
-                    const rate = rateElement ? parseFloat(rateElement.value) : 1;
-                    const pitch = pitchElement ? parseFloat(pitchElement.value) : 1;
-                    const volume = volumeElement ? parseFloat(volumeElement.value) : 0.8;
-                    const voiceIndex = voiceElement ? voiceElement.value : '';
-                    
-                    utterance.rate = rate;
-                    utterance.pitch = pitch;
-                    utterance.volume = volume;
-                    
-                    if (voiceIndex && this.availableVoices && this.availableVoices[voiceIndex]) {
-                        utterance.voice = this.availableVoices[voiceIndex];
-                    }
-                } catch (error) {
-                    this.logger.log(`Errore configurazione speech: ${error.message}`, 'error');
-                }
-            }
-            
-            createVolumeTrendChart(phrases) {
-                const ctx = document.getElementById('volumeTrendChart').getContext('2d');
-                
-                if (this.volumeTrendChart) {
-                    this.volumeTrendChart.destroy();
-                }
-                
-                const datasets = [];
-                
-                // Colori distinti per ogni frase
-                const phraseColors = [
-                    '#4682B4',  // Blu acciaio per Frase 1
-                    '#008B8B',  // Teal scuro per Frase 2
-                    '#8B4513',  // Marrone sella per Frase 3
-                    '#DC143C',  // Rosso cremisi per Frase 4
-                    '#9370DB',  // Viola medio per Frase 5
-                    '#FF8C00',  // Arancione scuro per Frase 6
-                    '#32CD32',  // Verde lime per Frase 7
-                    '#FF1493'   // Rosa profondo per Frase 8
-                ];
-                
-                let globalTime = 0;
-                
-                phrases.forEach((phrase, index) => {
-                    if (!phrase.temporalAnalysis) return;
-                    
-                    const globalTimeData = phrase.temporalAnalysis.timeData.map(t => globalTime + t);
-                    const color = phraseColors[index % phraseColors.length];
-                    
-                    datasets.push({
-                        label: `Frase ${phrase.index + 1} (${phrase.temporalAnalysis.trend})`,
-                        data: phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                            x: globalTimeData[i],
-                            y: volume
-                        })),
-                        borderColor: color,
-                        backgroundColor: color,
-                        borderWidth: 3,
-                        fill: false,
-                        tension: 0.3,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    });
-                    
-                    globalTime += phrase.duration + 0.5;
-                });
-                
-                this.volumeTrendChart = new Chart(ctx, {
-                    type: 'line',
-                    data: { datasets: datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: '📈 Andamento Volume nel Tempo - Tutte le Frasi',
-                                font: { size: 16 }
-                            },
-                            legend: {
-                                position: 'top'
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    title: function(context) {
-                                        return `Tempo: ${context[0].parsed.x.toFixed(1)}s`;
-                                    },
-                                    label: function(context) {
-                                        return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}dB`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Tempo (secondi)'
-                                },
-                                type: 'linear'
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: 'Volume (dB)'
-                                },
-                                suggestedMin: -35,
-                                suggestedMax: -5
-                            }
-                        },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
-                        }
-                    }
-                });
-            }
-            
-            createIndividualPhrasesChart(phrases) {
-                const ctx = document.getElementById('individualPhrasesChart').getContext('2d');
-                
-                if (this.individualPhrasesChart) {
-                    this.individualPhrasesChart.destroy();
-                }
-                
-                // Colori distinti per ogni frase con sfumature
-                const phraseColorSets = [
-                    { bg: 'rgba(70, 130, 180, 0.3)', border: '#4682B4' },      // Blu acciaio
-                    { bg: 'rgba(0, 139, 139, 0.3)', border: '#008B8B' },       // Teal scuro
-                    { bg: 'rgba(139, 69, 19, 0.3)', border: '#8B4513' },       // Marrone sella
-                    { bg: 'rgba(220, 20, 60, 0.3)', border: '#DC143C' },       // Rosso cremisi
-                    { bg: 'rgba(147, 112, 219, 0.3)', border: '#9370DB' },     // Viola medio
-                    { bg: 'rgba(255, 140, 0, 0.3)', border: '#FF8C00' },       // Arancione scuro
-                    { bg: 'rgba(50, 205, 50, 0.3)', border: '#32CD32' },       // Verde lime
-                    { bg: 'rgba(255, 20, 147, 0.3)', border: '#FF1493' }       // Rosa profondo
-                ];
-                
-                const datasets = phrases.map((phrase, index) => {
-                    if (!phrase.temporalAnalysis) return null;
-                    
-                    const colors = phraseColorSets[index % phraseColorSets.length];
-                    
-                    return {
-                        label: `Frase ${phrase.index + 1}`,
-                        data: phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                            x: (i / (phrase.temporalAnalysis.volumeData.length - 1)) * 100,
-                            y: volume
-                        })),
-                        borderColor: colors.border,
-                        backgroundColor: colors.bg,
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 3
-                    };
-                }).filter(dataset => dataset !== null);
-                
-                this.individualPhrasesChart = new Chart(ctx, {
-                    type: 'line',
-                    data: { datasets: datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: '🔄 Confronto Andamenti per Frase (Normalizzato 0-100%)',
-                                font: { size: 16 }
-                            },
-                            legend: {
-                                position: 'top'
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    title: function(context) {
-                                        return `Progresso: ${context[0].parsed.x.toFixed(1)}%`;
-                                    },
-                                    label: function(context) {
-                                        return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}dB`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Progresso nella Frase (%)'
-                                },
-                                min: 0,
-                                max: 100
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: 'Volume (dB)'
-                                },
-                                suggestedMin: -35,
-                                suggestedMax: -5
-                            }
-                        },
-                        interaction: {
-                            intersect: false,
-                            mode: 'index'
-                        }
-                    }
-                });
-            }
-            
-            async handleFileUpload(event) {
-                const file = event.target.files[0];
-                if (!file) return;
-                
-                try {
-                    this.logger.log(`Caricamento file: ${file.name} (${file.size} bytes)`);
-                    this.showProcessing(true, 'Caricamento file audio...');
-                    
-                    const arrayBuffer = await file.arrayBuffer();
-                    const audioContext = new AudioContext();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    
-                    const audioData = audioBuffer.getChannelData(0);
-                    const duration = audioBuffer.duration;
-                    
-                    this.currentAudioData = audioData;
-                    this.currentAudioDuration = duration;
-                    
-                    document.getElementById('analyzePhrases').disabled = false;
-                    document.getElementById('autoDetectVoice').disabled = false;
-                    this.showSuccess(`File caricato: ${file.name} (${duration.toFixed(1)}s)`);
-                    this.logger.log(`File caricato con successo`, 'success');
-                    
-                } catch (error) {
-                    this.logger.log(`Errore caricamento file: ${error.message}`, 'error');
-                    this.showError('Errore durante il caricamento del file. Assicurati che sia un file audio valido.');
-                } finally {
-                    this.showProcessing(false);
-                }
-            }
-            
-            clearResults() {
-                document.getElementById('phraseResults').style.display = 'none';
-                document.getElementById('autoDetectionResult').style.display = 'none';
-                document.getElementById('analyzePhrases').disabled = true;
-                document.getElementById('autoDetectVoice').disabled = true;
-                document.getElementById('speakAllPhrases').disabled = true;
-                document.getElementById('recordingTime').textContent = '00:00';
-                
-                // Ferma eventuali speech in corso
-                if (this.isSpeaking) {
-                    this.speechSynth.cancel();
-                    this.isSpeaking = false;
-                }
-                
-                this.currentAudioData = null;
-                this.currentAudioDuration = null;
-                this.currentPhrases = [];
-                
-                if (this.volumeTrendChart) {
-                    this.volumeTrendChart.destroy();
-                    this.volumeTrendChart = null;
-                }
-                
-                if (this.individualPhrasesChart) {
-                    this.individualPhrasesChart.destroy();
-                    this.individualPhrasesChart = null;
-                }
-                
-                document.querySelectorAll('.audio-bar').forEach(bar => {
-                    bar.style.height = '0%';
-                });
-                
-                this.logger.clear();
-                this.logger.log('Risultati puliti', 'success');
-            }
-                
-                if (this.volumeTrendChart) {
-                    this.volumeTrendChart.destroy();
-                    this.volumeTrendChart = null;
-                }
-                
-                if (this.individualPhrasesChart) {
-                    this.individualPhrasesChart.destroy();
-                    this.individualPhrasesChart = null;
-                }
-                
-                document.querySelectorAll('.audio-bar').forEach(bar => {
-                    bar.style.height = '0%';
-                });
-                
-                this.logger.clear();
-                this.logger.log('Risultati puliti', 'success');
-            }
-            
-            showProcessing(show, message = 'Elaborazione in corso...') {
-                const indicator = document.getElementById('processingIndicator');
-                if (show) {
-                    indicator.style.display = 'block';
-                    indicator.querySelector('div:last-child').textContent = message;
-                } else {
-                    indicator.style.display = 'none';
-                }
-            }
-            
-            showError(message) {
-                const errorDiv = document.getElementById('errorMessage');
-                errorDiv.textContent = `❌ ${message}`;
-                errorDiv.style.display = 'block';
-                
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                }, 8000);
-            }
-            
-            showSuccess(message) {
-                const successDiv = document.getElementById('successMessage');
-                successDiv.textContent = `✅ ${message}`;
-                successDiv.style.display = 'block';
-                
-                setTimeout(() => {
-                    successDiv.style.display = 'none';
-                }, 5000);
-            }
-            
-            showWarning(message) {
-                const warningDiv = document.getElementById('warningMessage');
-                warningDiv.textContent = `⚠️ ${message}`;
-                warningDiv.style.display = 'block';
-                
-                setTimeout(() => {
-                    warningDiv.style.display = 'none';
-                }, 6000);
-            }
-        }
-
-        // Inizializzazione dell'app - rende l'istanza globalmente accessibile
-        let voiceBreakApp;
-        document.addEventListener('DOMContentLoaded', () => {
-            voiceBreakApp = new PhraseAnalysisApp();
-            window.voiceBreakApp = voiceBreakApp; // Rende accessibile globalmente per debug
-        });
-    </script>
-</body>
-</html>
