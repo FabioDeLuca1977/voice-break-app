@@ -1,782 +1,4 @@
-<input type="file" id="fileInput" accept="audio/*" style="display: none;">
-                    
-                    <div class="tts-controls">
-                        <h4>🔊 Text-to-Speech</h4>
-                        <div class="voice-settings">
-                            <div class="voice-setting">
-                                <label>Velocità</label>
-                                <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1">
-                            </div>
-                            <div class="voice-setting">
-                                <label>Pitch</label>
-                                <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1">
-                            </div>
-                            <div class="voice-setting">
-                                <label>Volume</label>
-                                <input type="range" id="speechVolume" min="0" max="1" step="0.1" value="0.8">
-                            </div>
-                            <div class="voice-setting">
-                                <label>Voce</label>
-                                <select id="speechVoice">
-                                    <option value="">Default</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button id="speakAllPhrases" class="btn" disabled>
-                            <span>🎤</span>
-                            Leggi Tutte le Frasi
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="auto-detection-result" id="autoDetectionResult">
-                <div class="detected-voice" id="detectedVoice">🎤 Analizzando...</div>
-                <div class="confidence-score" id="confidenceScore">Precisione: --</div>
-                <div class="voice-breakdown" id="voiceBreakdown">
-                    <div class="voice-score">
-                        <div>🌬️ ARIA</div>
-                        <div id="scoreAria">--%</div>
-                    </div>
-                    <div class="voice-score">
-                        <div>💧 ACQUA</div>
-                        <div id="scoreAcqua">--%</div>
-                    </div>
-                    <div class="voice-score">
-                        <div>🌍 TERRA</div>
-                        <div id="scoreTerra">--%</div>
-                    </div>
-                    <div class="voice-score">
-                        <div>🔥 FUOCO</div>
-                        <div id="scoreFuoco">--%</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="error-message" id="errorMessage"></div>
-            <div class="success-message" id="successMessage"></div>
-            <div class="warning-message" id="warningMessage"></div>
-            
-            <div class="processing-indicator" id="processingIndicator">
-                <div class="spinner"></div>
-                <div>Analizzando le frasi...</div>
-            </div>
-
-            <div class="debug-section">
-                <div class="debug-title">🔍 Log di Debug</div>
-                <div class="debug-log" id="debugLog">
-                    Inizializzazione sistema...<br>
-                </div>
-            </div>
-
-            <div class="phrase-results" id="phraseResults">
-                <div class="phrases-summary" id="phrasesSummary">
-                    <div class="summary-card">
-                        <div class="summary-number" id="totalPhrases">0</div>
-                        <div class="summary-label">Frasi Rilevate</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-number" id="dominantVoice">--</div>
-                        <div class="summary-label">Voce Dominante</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-number" id="avgPhraseDuration">0.0s</div>
-                        <div class="summary-label">Durata Media Frase</div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-number" id="overallClarity">--</div>
-                        <div class="summary-label">Chiarezza Generale</div>
-                    </div>
-                </div>
-
-                <div class="phrase-info-grid" id="phraseInfoGrid"></div>
-
-                <div class="chart-container">
-                    <canvas id="volumeTrendChart"></canvas>
-                </div>
-
-                <div class="chart-container">
-                    <canvas id="individualPhrasesChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // === VARIABILI GLOBALI ===
-        let app = {
-            logger: null,
-            isRecording: false,
-            currentAudioData: null,
-            currentPhrases: [],
-            isSpeaking: false,
-            speechSynth: window.speechSynthesis,
-            availableVoices: [],
-            volumeTrendChart: null,
-            individualPhrasesChart: null
-        };
-
-        // === FUNZIONI UTILITY ===
-        function log(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
-            const logEntry = `${timestamp} ${prefix} ${message}<br>`;
-            
-            const logElement = document.getElementById('debugLog');
-            if (logElement) {
-                logElement.innerHTML += logEntry;
-                logElement.scrollTop = logElement.scrollHeight;
-            }
-            
-            console.log(`[Voice Break AI] ${message}`);
-        }
-
-        function showMessage(message, type = 'success') {
-            const messageEl = document.getElementById(`${type}Message`);
-            if (messageEl) {
-                messageEl.textContent = `${type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅'} ${message}`;
-                messageEl.style.display = 'block';
-                
-                setTimeout(() => {
-                    messageEl.style.display = 'none';
-                }, type === 'error' ? 8000 : 5000);
-            }
-        }
-
-        function showProcessing(show, message = 'Elaborazione in corso...') {
-            const indicator = document.getElementById('processingIndicator');
-            if (!indicator) return;
-            
-            if (show) {
-                indicator.style.display = 'block';
-                const messageEl = indicator.querySelector('div:last-child');
-                if (messageEl) messageEl.textContent = message;
-            } else {
-                indicator.style.display = 'none';
-            }
-        }
-
-        // === FUNZIONI PRINCIPALI ===
-        function generateSampleText(trend) {
-            const samples = {
-                ascending: ["Sono sempre più motivato", "La mia energia cresce", "Vedo nuove possibilità"],
-                descending: ["Ora mi sento più calmo", "La tensione si dissolve", "Trovo la mia pace interiore"],
-                stable: ["Sono centrato e presente", "Mantengo il mio equilibrio", "La stabilità è la mia forza"],
-                dynamic: ["L'energia scorre in me", "Sento il ritmo del cambiamento", "La vita pulsa attraverso di me"]
-            };
-            
-            const trendSamples = samples[trend] || samples.stable;
-            return trendSamples[Math.floor(Math.random() * trendSamples.length)];
-        }
-
-        function detectPhrases(audioBuffer) {
-            log(`Iniziando rilevamento frasi. Buffer length: ${audioBuffer.length}`);
-            
-            if (audioBuffer.length === 0) {
-                log('Buffer audio vuoto!', 'error');
-                return [];
-            }
-            
-            // Simulazione del rilevamento frasi per demo
-            const phrases = [];
-            const numPhrases = Math.min(4, Math.floor(audioBuffer.length / 44100) + 1);
-            
-            for (let i = 0; i < numPhrases; i++) {
-                const trends = ['ascending', 'descending', 'stable', 'dynamic'];
-                const trend = trends[i % trends.length];
-                
-                phrases.push({
-                    index: i,
-                    duration: 1.5 + Math.random() * 2,
-                    temporalAnalysis: {
-                        trend: trend,
-                        volumeChange: (Math.random() - 0.5) * 10,
-                        avgVolume: -30 + Math.random() * 15,
-                        volumeData: Array.from({length: 20}, () => -35 + Math.random() * 20),
-                        timeData: Array.from({length: 20}, (_, j) => j * 0.1)
-                    },
-                    features: {
-                        avgVolume: -30 + Math.random() * 15,
-                        pitch: 150 + Math.random() * 100,
-                        spectralEnergy: Math.random() * 0.8
-                    }
-                });
-            }
-            
-            log(`Rilevate ${phrases.length} frasi`);
-            return phrases;
-        }
-
-        function classifyVoice(phrases) {
-            if (!phrases || phrases.length === 0) {
-                return {
-                    detectedVoice: 'UNKNOWN',
-                    confidence: 0,
-                    scores: { ARIA: 25, ACQUA: 25, TERRA: 25, FUOCO: 25 }
-                };
-            }
-            
-            // Simulazione classificazione
-            const voices = ['ARIA', 'ACQUA', 'TERRA', 'FUOCO'];
-            const scores = {};
-            let total = 0;
-            
-            voices.forEach(voice => {
-                scores[voice] = Math.random() * 100;
-                total += scores[voice];
-            });
-            
-            // Normalizza
-            voices.forEach(voice => {
-                scores[voice] = (scores[voice] / total) * 100;
-            });
-            
-            const detectedVoice = voices.reduce((a, b) => scores[a] > scores[b] ? a : b);
-            const confidence = scores[detectedVoice] / 100;
-            
-            log(`Voce rilevata: ${detectedVoice} (${(confidence * 100).toFixed(1)}%)`, 'success');
-            
-            return {
-                detectedVoice,
-                confidence,
-                scores
-            };
-        }
-
-        function speakText(text, phraseIndex = null) {
-            if (!app.speechSynth) {
-                log('Speech Synthesis non disponibile', 'error');
-                return;
-            }
-            
-            if (app.isSpeaking) {
-                app.speechSynth.cancel();
-                app.isSpeaking = false;
-                
-                // Reset pulsanti
-                document.querySelectorAll('.speak-btn').forEach(btn => {
-                    btn.classList.remove('speaking');
-                    btn.innerHTML = '<span>🔊</span>Ascolta';
-                });
-                return;
-            }
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Configura TTS
-            const rate = document.getElementById('speechRate')?.value || 1;
-            const pitch = document.getElementById('speechPitch')?.value || 1;
-            const volume = document.getElementById('speechVolume')?.value || 0.8;
-            const voiceIndex = document.getElementById('speechVoice')?.value;
-            
-            utterance.rate = parseFloat(rate);
-            utterance.pitch = parseFloat(pitch);
-            utterance.volume = parseFloat(volume);
-            
-            if (voiceIndex && app.availableVoices[voiceIndex]) {
-                utterance.voice = app.availableVoices[voiceIndex];
-            }
-            
-            app.isSpeaking = true;
-            
-            if (phraseIndex !== null) {
-                const btn = document.querySelector(`[data-phrase-index="${phraseIndex}"]`);
-                if (btn) {
-                    btn.classList.add('speaking');
-                    btn.innerHTML = '<span>⏹️</span>Stop';
-                }
-            }
-            
-            utterance.onend = () => {
-                app.isSpeaking = false;
-                if (phraseIndex !== null) {
-                    const btn = document.querySelector(`[data-phrase-index="${phraseIndex}"]`);
-                    if (btn) {
-                        btn.classList.remove('speaking');
-                        btn.innerHTML = '<span>🔊</span>Ascolta';
-                    }
-                }
-            };
-            
-            utterance.onerror = () => {
-                app.isSpeaking = false;
-                log('Errore TTS', 'error');
-            };
-            
-            app.speechSynth.speak(utterance);
-            log(`TTS: "${text}"`);
-        }
-
-        function createChart(phrases, chartId, title) {
-            const ctx = document.getElementById(chartId);
-            if (!ctx) return;
-            
-            const context = ctx.getContext('2d');
-            
-            if (chartId === 'volumeTrendChart' && app.volumeTrendChart) {
-                app.volumeTrendChart.destroy();
-            }
-            if (chartId === 'individualPhrasesChart' && app.individualPhrasesChart) {
-                app.individualPhrasesChart.destroy();
-            }
-            
-            const colors = ['#4682B4', '#008B8B', '#8B4513', '#DC143C', '#9370DB', '#FF8C00', '#32CD32', '#FF1493'];
-            const datasets = [];
-            
-            phrases.forEach((phrase, index) => {
-                if (!phrase.temporalAnalysis) return;
-                
-                const color = colors[index % colors.length];
-                let data;
-                
-                if (chartId === 'volumeTrendChart') {
-                    // Timeline globale
-                    const globalTime = index * 2.5; // Spaziatura tra frasi
-                    data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                        x: globalTime + phrase.temporalAnalysis.timeData[i],
-                        y: volume
-                    }));
-                } else {
-                    // Confronto normalizzato
-                    data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
-                        x: (i / (phrase.temporalAnalysis.volumeData.length - 1)) * 100,
-                        y: volume
-                    }));
-                }
-                
-                datasets.push({
-                    label: `Frase ${phrase.index + 1}`,
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: chartId === 'individualPhrasesChart' ? color + '30' : color,
-                    borderWidth: 3,
-                    fill: chartId === 'individualPhrasesChart',
-                    tension: 0.3,
-                    pointRadius: 4
-                });
-            });
-            
-            const chart = new Chart(context, {
-                type: 'line',
-                data: { datasets: datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: title,
-                            font: { size: 16 }
-                        },
-                        legend: {
-                            position: 'top'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: chartId === 'volumeTrendChart' ? 'Tempo (secondi)' : 'Progresso (%)'
-                            },
-                            type: 'linear'
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Volume (dB)'
-                            },
-                            suggestedMin: -35,
-                            suggestedMax: -5
-                        }
-                    }
-                }
-            });
-            
-            if (chartId === 'volumeTrendChart') {
-                app.volumeTrendChart = chart;
-            } else {
-                app.individualPhrasesChart = chart;
-            }
-        }
-
-        // === EVENT HANDLERS ===
-        function testMicrophone() {
-            log('Test microfono avviato...');
-            
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    log('Microfono accessibile ✅', 'success');
-                    showMessage('Microfono funziona correttamente!');
-                    stream.getTracks().forEach(track => track.stop());
-                })
-                .catch(error => {
-                    log(`Errore microfono: ${error.message}`, 'error');
-                    showMessage('Errore accesso microfono. Controlla i permessi.', 'error');
-                });
-        }
-
-        function startRecording() {
-            log('Avvio registrazione...');
-            
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    app.isRecording = true;
-                    log('Registrazione avviata', 'success');
-                    showMessage('Registrazione in corso... Parla chiaramente!');
-                    
-                    // Simula registrazione per 3 secondi
-                    setTimeout(() => {
-                        stopRecording();
-                        // Simula audio data
-                        app.currentAudioData = new Float32Array(44100 * 3); // 3 secondi di audio
-                        for (let i = 0; i < app.currentAudioData.length; i++) {
-                            app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
-                        }
-                        
-                        document.getElementById('analyzePhrases').disabled = false;
-                        document.getElementById('autoDetectVoice').disabled = false;
-                        showMessage('Audio registrato: 3.0s');
-                    }, 3000);
-                    
-                    // Aggiorna UI
-                    document.getElementById('startRecording').disabled = true;
-                    document.getElementById('stopRecording').disabled = false;
-                    document.getElementById('startRecording').classList.add('recording');
-                    
-                    stream.getTracks().forEach(track => track.stop());
-                })
-                .catch(error => {
-                    log(`Errore registrazione: ${error.message}`, 'error');
-                    showMessage('Errore durante la registrazione', 'error');
-                });
-        }
-
-        function stopRecording() {
-            if (app.isRecording) {
-                app.isRecording = false;
-                log('Registrazione fermata', 'success');
-                
-                // Aggiorna UI
-                document.getElementById('startRecording').disabled = false;
-                document.getElementById('stopRecording').disabled = true;
-                document.getElementById('startRecording').classList.remove('recording');
-            }
-        }
-
-        function autoDetectVoice() {
-            if (!app.currentAudioData) {
-                showMessage('Nessun audio da analizzare. Registra prima un audio.', 'error');
-                return;
-            }
-            
-            log('Iniziando auto-rilevamento voce...');
-            showProcessing(true, 'Analizzando automaticamente la voce...');
-            
-            setTimeout(() => {
-                const phrases = detectPhrases(app.currentAudioData);
-                const classification = classifyVoice(phrases);
-                
-                // Mostra risultati
-                document.getElementById('autoDetectionResult').style.display = 'block';
-                
-                const voiceEmojis = { ARIA: '🌬️', ACQUA: '💧', TERRA: '🌍', FUOCO: '🔥' };
-                document.getElementById('detectedVoice').textContent = 
-                    `${voiceEmojis[classification.detectedVoice]} ${classification.detectedVoice}`;
-                
-                document.getElementById('confidenceScore').textContent = 
-                    `Precisione: ${(classification.confidence * 100).toFixed(1)}%`;
-                
-                document.getElementById('scoreAria').textContent = `${classification.scores.ARIA.toFixed(1)}%`;
-                document.getElementById('scoreAcqua').textContent = `${classification.scores.ACQUA.toFixed(1)}%`;
-                document.getElementById('scoreTerra').textContent = `${classification.scores.TERRA.toFixed(1)}%`;
-                document.getElementById('scoreFuoco').textContent = `${classification.scores.FUOCO.toFixed(1)}%`;
-                
-                showProcessing(false);
-                showMessage(`Voce rilevata: ${classification.detectedVoice} con precisione ${(classification.confidence * 100).toFixed(1)}%`);
-            }, 1500);
-        }
-
-        function analyzePhrases() {
-            if (!app.currentAudioData) {
-                showMessage('Nessun audio da analizzare. Registra o carica un file audio.', 'error');
-                return;
-            }
-            
-            log('Iniziando analisi frasi dettagliata...');
-            showProcessing(true, 'Analizzando le frasi...');
-            
-            setTimeout(() => {
-                const phrases = detectPhrases(app.currentAudioData);
-                const classification = classifyVoice(phrases);
-                
-                if (phrases.length === 0) {
-                    showMessage('Nessuna frase rilevata. Prova a registrare di nuovo.', 'error');
-                    showProcessing(false);
-                    return;
-                }
-                
-                app.currentPhrases = phrases;
-                
-                // Aggiorna summary
-                document.getElementById('phraseResults').style.display = 'block';
-                document.getElementById('totalPhrases').textContent = phrases.length;
-                document.getElementById('dominantVoice').textContent = `🎤 ${classification.detectedVoice}`;
-                document.getElementById('avgPhraseDuration').textContent = 
-                    `${(phrases.reduce((sum, p) => sum + p.duration, 0) / phrases.length).toFixed(1)}s`;
-                document.getElementById('overallClarity').textContent = 
-                    classification.confidence > 0.7 ? 'Alta' : classification.confidence > 0.5 ? 'Media' : 'Bassa';
-                
-                // Crea cards frasi
-                const container = document.getElementById('phraseInfoGrid');
-                container.innerHTML = '';
-                
-                const trendDescriptions = {
-                    ascending: '📈 Crescente',
-                    descending: '📉 Calante',
-                    stable: '➡️ Stabile',
-                    dynamic: '🎢 Dinamico'
-                };
-                
-                phrases.forEach((phrase, index) => {
-                    const card = document.createElement('div');
-                    card.className = `phrase-card trend-${phrase.temporalAnalysis.trend}`;
-                    
-                    const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
-                    
-                    card.innerHTML = `
-                        <div class="phrase-title">Frase ${phrase.index + 1}</div>
-                        <div class="phrase-trend trend-${phrase.temporalAnalysis.trend}">
-                            ${trendDescriptions[phrase.temporalAnalysis.trend]}
-                        </div>
-                        <div>Durata: ${phrase.duration.toFixed(1)}s</div>
-                        <div>Cambio: ${phrase.temporalAnalysis.volumeChange > 0 ? '+' : ''}${phrase.temporalAnalysis.volumeChange.toFixed(1)}dB</div>
-                        <div>Media: ${phrase.temporalAnalysis.avgVolume.toFixed(1)}dB</div>
-                        <div style="margin-top: 8px; font-style: italic; color: #666; font-size: 12px;">
-                            "${sampleText}"
-                        </div>
-                        <div class="phrase-controls">
-                            <button class="speak-btn" data-phrase-index="${index}">
-                                <span>🔊</span>
-                                Ascolta
-                            </button>
-                        </div>
-                    `;
-                    
-                    const speakBtn = card.querySelector('.speak-btn');
-                    speakBtn.addEventListener('click', () => speakText(sampleText, index));
-                    
-                    container.appendChild(card);
-                });
-                
-                // Crea grafici
-                createChart(phrases, 'volumeTrendChart', '📈 Andamento Volume nel Tempo - Tutte le Frasi');
-                createChart(phrases, 'individualPhrasesChart', '🔄 Confronto Andamenti per Frase (Normalizzato 0-100%)');
-                
-                // Abilita TTS per tutte le frasi
-                document.getElementById('speakAllPhrases').disabled = false;
-                
-                showProcessing(false);
-                showMessage(`Analisi completata: ${phrases.length} frasi rilevate`);
-            }, 2000);
-        }
-
-        function speakAllPhrases() {
-            if (app.isSpeaking) {
-                app.speechSynth.cancel();
-                app.isSpeaking = false;
-                document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
-                return;
-            }
-            
-            if (app.currentPhrases.length === 0) return;
-            
-            app.isSpeaking = true;
-            document.getElementById('speakAllPhrases').innerHTML = '<span>⏹️</span>Ferma Lettura';
-            
-            let currentIndex = 0;
-            
-            function speakNext() {
-                if (currentIndex >= app.currentPhrases.length || !app.isSpeaking) {
-                    app.isSpeaking = false;
-                    document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
-                    return;
-                }
-                
-                const phrase = app.currentPhrases[currentIndex];
-                const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
-                
-                const utterance = new SpeechSynthesisUtterance(sampleText);
-                
-                // Configura TTS
-                const rate = document.getElementById('speechRate')?.value || 1;
-                const pitch = document.getElementById('speechPitch')?.value || 1;
-                const volume = document.getElementById('speechVolume')?.value || 0.8;
-                
-                utterance.rate = parseFloat(rate);
-                utterance.pitch = parseFloat(pitch);
-                utterance.volume = parseFloat(volume);
-                
-                utterance.onend = () => {
-                    currentIndex++;
-                    setTimeout(speakNext, 500);
-                };
-                
-                app.speechSynth.speak(utterance);
-                log(`TTS: "${sampleText}" (Frase ${currentIndex + 1})`);
-            }
-            
-            speakNext();
-        }
-
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            log(`Caricamento file: ${file.name}`);
-            showProcessing(true, 'Caricamento file audio...');
-            
-            setTimeout(() => {
-                // Simula caricamento file
-                app.currentAudioData = new Float32Array(44100 * 5); // 5 secondi
-                for (let i = 0; i < app.currentAudioData.length; i++) {
-                    app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
-                }
-                
-                document.getElementById('analyzePhrases').disabled = false;
-                document.getElementById('autoDetectVoice').disabled = false;
-                
-                showProcessing(false);
-                showMessage(`File caricato: ${file.name} (5.0s)`);
-                log('File caricato con successo', 'success');
-            }, 1000);
-        }
-
-        function selectVoice(voiceName) {
-            document.querySelectorAll('.voice-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            const selectedCard = document.querySelector(`[data-voice="${voiceName}"]`);
-            if (selectedCard) selectedCard.classList.add('selected');
-            
-            log(`Voce selezionata: ${voiceName}`, 'success');
-        }
-
-        function clearResults() {
-            document.getElementById('phraseResults').style.display = 'none';
-            document.getElementById('autoDetectionResult').style.display = 'none';
-            document.getElementById('analyzePhrases').disabled = true;
-            document.getElementById('autoDetectVoice').disabled = true;
-            document.getElementById('speakAllPhrases').disabled = true;
-            document.getElementById('recordingTime').textContent = '00:00';
-            
-            if (app.isSpeaking) {
-                app.speechSynth.cancel();
-                app.isSpeaking = false;
-            }
-            
-            app.currentAudioData = null;
-            app.currentPhrases = [];
-            
-            if (app.volumeTrendChart) {
-                app.volumeTrendChart.destroy();
-                app.volumeTrendChart = null;
-            }
-            
-            if (app.individualPhrasesChart) {
-                app.individualPhrasesChart.destroy();
-                app.individualPhrasesChart = null;
-            }
-            
-            document.getElementById('debugLog').innerHTML = 'Log pulito...<br>';
-            log('Risultati puliti', 'success');
-        }
-
-        function setupTTS() {
-            if (!app.speechSynth) {
-                log('Speech Synthesis non disponibile', 'warning');
-                return;
-            }
-            
-            function loadVoices() {
-                app.availableVoices = app.speechSynth.getVoices();
-                const voiceSelect = document.getElementById('speechVoice');
-                
-                if (voiceSelect) {
-                    voiceSelect.innerHTML = '<option value="">Default</option>';
-                    
-                    app.availableVoices.forEach((voice, index) => {
-                        const option = document.createElement('option');
-                        option.value = index;
-                        option.textContent = `${voice.name} (${voice.lang})`;
-                        voiceSelect.appendChild(option);
-                    });
-                    
-                    log(`Caricate ${app.availableVoices.length} voci TTS`, 'success');
-                }
-            }
-            
-            if (app.speechSynth.getVoices().length > 0) {
-                loadVoices();
-            } else {
-                app.speechSynth.addEventListener('voiceschanged', loadVoices);
-            }
-        }
-
-        function setupAudioVisualizer() {
-            const visualizer = document.getElementById('audioVisualizer');
-            if (visualizer) {
-                for (let i = 0; i < 50; i++) {
-                    const bar = document.createElement('div');
-                    bar.className = 'audio-bar';
-                    bar.style.left = `${i * 4}px`;
-                    visualizer.appendChild(bar);
-                }
-            }
-        }
-
-        // === INIZIALIZZAZIONE ===
-        document.addEventListener('DOMContentLoaded', function() {
-            log('Voice Break AI inizializzata!', 'success');
-            
-            // Setup event listeners
-            document.getElementById('testMicrophone').addEventListener('click', testMicrophone);
-            document.getElementById('startRecording').addEventListener('click', startRecording);
-            document.getElementById('stopRecording').addEventListener('click', stopRecording);
-            document.getElementById('autoDetectVoice').addEventListener('click', autoDetectVoice);
-            document.getElementById('analyzePhrases').addEventListener('click', analyzePhrases);
-            document.getElementById('clearResults').addEventListener('click', clearResults);
-            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
-            document.getElementById('speakAllPhrases').addEventListener('click', speakAllPhrases);
-            
-            // Voice cards
-            document.querySelectorAll('.voice-card').forEach(card => {
-                card.addEventListener('click', () => selectVoice(card.dataset.voice));
-            });
-            
-            // Setup componenti
-            setupTTS();
-            setupAudioVisualizer();
-            
-            // Controllo compatibilità browser
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                log('MediaDevices API non supportata', 'error');
-                showMessage('Browser non compatibile. Usa Chrome o Firefox.', 'error');
-                return;
-            }
-            
-            if (typeof MediaRecorder === 'undefined') {
-                log('MediaRecorder non supportato', 'error');
-                showMessage('MediaRecorder non supportato. Aggiorna il browser.', 'error');
-                return;
-            }
-            
-            log('Browser compatibile ✅', 'success');
-            log('Tutti i sistemi operativi. App pronta per l\'uso!', 'success');
-        });
-    </script>
-</body>
-</html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -1267,3 +489,882 @@
                         Carica Audio
                     </label>
                     <input type="file" id="fileInput" accept="audio/*" style="display: none;">
+                    
+                    <div class="tts-controls">
+                        <h4>🔊 Text-to-Speech</h4>
+                        <div class="voice-settings">
+                            <div class="voice-setting">
+                                <label>Velocità</label>
+                                <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Pitch</label>
+                                <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Volume</label>
+                                <input type="range" id="speechVolume" min="0" max="1" step="0.1" value="0.8">
+                            </div>
+                            <div class="voice-setting">
+                                <label>Voce</label>
+                                <select id="speechVoice">
+                                    <option value="">Default</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="speakAllPhrases" class="btn" disabled>
+                            <span>🎤</span>
+                            Leggi Tutte le Frasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auto-detection-result" id="autoDetectionResult">
+                <div class="detected-voice" id="detectedVoice">🎤 Analizzando...</div>
+                <div class="confidence-score" id="confidenceScore">Precisione: --</div>
+                <div class="voice-breakdown" id="voiceBreakdown">
+                    <div class="voice-score">
+                        <div>🌬️ ARIA</div>
+                        <div id="scoreAria">--%</div>
+                    </div>
+                    <div class="voice-score">
+                        <div>💧 ACQUA</div>
+                        <div id="scoreAcqua">--%</div>
+                    </div>
+                    <div class="voice-score">
+                        <div>🌍 TERRA</div>
+                        <div id="scoreTerra">--%</div>
+                    </div>
+                    <div class="voice-score">
+                        <div>🔥 FUOCO</div>
+                        <div id="scoreFuoco">--%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+            <div class="warning-message" id="warningMessage"></div>
+            
+            <div class="processing-indicator" id="processingIndicator">
+                <div class="spinner"></div>
+                <div>Analizzando le frasi...</div>
+            </div>
+
+            <div class="debug-section">
+                <div class="debug-title">🔍 Log di Debug</div>
+                <div class="debug-log" id="debugLog">
+                    Inizializzazione sistema...<br>
+                </div>
+            </div>
+
+            <div class="phrase-results" id="phraseResults">
+                <div class="phrases-summary" id="phrasesSummary">
+                    <div class="summary-card">
+                        <div class="summary-number" id="totalPhrases">0</div>
+                        <div class="summary-label">Frasi Rilevate</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="dominantVoice">--</div>
+                        <div class="summary-label">Voce Dominante</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="avgPhraseDuration">0.0s</div>
+                        <div class="summary-label">Durata Media Frase</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number" id="overallClarity">--</div>
+                        <div class="summary-label">Chiarezza Generale</div>
+                    </div>
+                </div>
+
+                <div class="phrase-info-grid" id="phraseInfoGrid"></div>
+
+                <div class="chart-container">
+                    <canvas id="volumeTrendChart"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="individualPhrasesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === VARIABILI GLOBALI ===
+        let app = {
+            logger: null,
+            isRecording: false,
+            currentAudioData: null,
+            currentPhrases: [],
+            isSpeaking: false,
+            speechSynth: window.speechSynthesis,
+            availableVoices: [],
+            volumeTrendChart: null,
+            individualPhrasesChart: null,
+            mediaRecorder: null,
+            recordingChunks: [],
+            recordingStartTime: null,
+            recordingTimer: null
+        };
+
+        // === FUNZIONI UTILITY ===
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            const logEntry = `${timestamp} ${prefix} ${message}<br>`;
+            
+            const logElement = document.getElementById('debugLog');
+            if (logElement) {
+                logElement.innerHTML += logEntry;
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+            
+            console.log(`[Voice Break AI] ${message}`);
+        }
+
+        function showMessage(message, type = 'success') {
+            const messageEl = document.getElementById(`${type}Message`);
+            if (messageEl) {
+                messageEl.textContent = `${type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '✅'} ${message}`;
+                messageEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, type === 'error' ? 8000 : 5000);
+            }
+        }
+
+        function showProcessing(show, message = 'Elaborazione in corso...') {
+            const indicator = document.getElementById('processingIndicator');
+            if (!indicator) return;
+            
+            if (show) {
+                indicator.style.display = 'block';
+                const messageEl = indicator.querySelector('div:last-child');
+                if (messageEl) messageEl.textContent = message;
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+
+        function updateRecordingTimer() {
+            if (!app.recordingStartTime) return;
+            
+            const elapsed = (Date.now() - app.recordingStartTime) / 1000;
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = Math.floor(elapsed % 60);
+            
+            document.getElementById('recordingTime').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // === FUNZIONI PRINCIPALI ===
+        function generateSampleText(trend) {
+            const samples = {
+                ascending: ["Sono sempre più motivato", "La mia energia cresce", "Vedo nuove possibilità"],
+                descending: ["Ora mi sento più calmo", "La tensione si dissolve", "Trovo la mia pace interiore"],
+                stable: ["Sono centrato e presente", "Mantengo il mio equilibrio", "La stabilità è la mia forza"],
+                dynamic: ["L'energia scorre in me", "Sento il ritmo del cambiamento", "La vita pulsa attraverso di me"]
+            };
+            
+            const trendSamples = samples[trend] || samples.stable;
+            return trendSamples[Math.floor(Math.random() * trendSamples.length)];
+        }
+
+        function detectPhrases(audioBuffer) {
+            log(`Iniziando rilevamento frasi. Buffer length: ${audioBuffer.length}`);
+            
+            if (audioBuffer.length === 0) {
+                log('Buffer audio vuoto!', 'error');
+                return [];
+            }
+            
+            // Simulazione del rilevamento frasi per demo
+            const phrases = [];
+            const numPhrases = Math.min(4, Math.floor(audioBuffer.length / 44100) + 1);
+            
+            for (let i = 0; i < numPhrases; i++) {
+                const trends = ['ascending', 'descending', 'stable', 'dynamic'];
+                const trend = trends[i % trends.length];
+                
+                phrases.push({
+                    index: i,
+                    duration: 1.5 + Math.random() * 2,
+                    temporalAnalysis: {
+                        trend: trend,
+                        volumeChange: (Math.random() - 0.5) * 10,
+                        avgVolume: -30 + Math.random() * 15,
+                        volumeData: Array.from({length: 20}, () => -35 + Math.random() * 20),
+                        timeData: Array.from({length: 20}, (_, j) => j * 0.1)
+                    },
+                    features: {
+                        avgVolume: -30 + Math.random() * 15,
+                        pitch: 150 + Math.random() * 100,
+                        spectralEnergy: Math.random() * 0.8
+                    }
+                });
+            }
+            
+            log(`Rilevate ${phrases.length} frasi`);
+            return phrases;
+        }
+
+        function classifyVoice(phrases) {
+            if (!phrases || phrases.length === 0) {
+                return {
+                    detectedVoice: 'UNKNOWN',
+                    confidence: 0,
+                    scores: { ARIA: 25, ACQUA: 25, TERRA: 25, FUOCO: 25 }
+                };
+            }
+            
+            // Simulazione classificazione
+            const voices = ['ARIA', 'ACQUA', 'TERRA', 'FUOCO'];
+            const scores = {};
+            let total = 0;
+            
+            voices.forEach(voice => {
+                scores[voice] = Math.random() * 100;
+                total += scores[voice];
+            });
+            
+            // Normalizza
+            voices.forEach(voice => {
+                scores[voice] = (scores[voice] / total) * 100;
+            });
+            
+            const detectedVoice = voices.reduce((a, b) => scores[a] > scores[b] ? a : b);
+            const confidence = scores[detectedVoice] / 100;
+            
+            log(`Voce rilevata: ${detectedVoice} (${(confidence * 100).toFixed(1)}%)`, 'success');
+            
+            return {
+                detectedVoice,
+                confidence,
+                scores
+            };
+        }
+
+        function speakText(text, phraseIndex = null) {
+            if (!app.speechSynth) {
+                log('Speech Synthesis non disponibile', 'error');
+                return;
+            }
+            
+            if (app.isSpeaking) {
+                app.speechSynth.cancel();
+                app.isSpeaking = false;
+                
+                // Reset pulsanti
+                document.querySelectorAll('.speak-btn').forEach(btn => {
+                    btn.classList.remove('speaking');
+                    btn.innerHTML = '<span>🔊</span>Ascolta';
+                });
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Configura TTS
+            const rate = document.getElementById('speechRate')?.value || 1;
+            const pitch = document.getElementById('speechPitch')?.value || 1;
+            const volume = document.getElementById('speechVolume')?.value || 0.8;
+            const voiceIndex = document.getElementById('speechVoice')?.value;
+            
+            utterance.rate = parseFloat(rate);
+            utterance.pitch = parseFloat(pitch);
+            utterance.volume = parseFloat(volume);
+            
+            if (voiceIndex && app.availableVoices[voiceIndex]) {
+                utterance.voice = app.availableVoices[voiceIndex];
+            }
+            
+            app.isSpeaking = true;
+            
+            if (phraseIndex !== null) {
+                const btn = document.querySelector(`[data-phrase-index="${phraseIndex}"]`);
+                if (btn) {
+                    btn.classList.add('speaking');
+                    btn.innerHTML = '<span>⏹️</span>Stop';
+                }
+            }
+            
+            utterance.onend = () => {
+                app.isSpeaking = false;
+                if (phraseIndex !== null) {
+                    const btn = document.querySelector(`[data-phrase-index="${phraseIndex}"]`);
+                    if (btn) {
+                        btn.classList.remove('speaking');
+                        btn.innerHTML = '<span>🔊</span>Ascolta';
+                    }
+                }
+            };
+            
+            utterance.onerror = () => {
+                app.isSpeaking = false;
+                log('Errore TTS', 'error');
+            };
+            
+            app.speechSynth.speak(utterance);
+            log(`TTS: "${text}"`);
+        }
+
+        function createChart(phrases, chartId, title) {
+            const ctx = document.getElementById(chartId);
+            if (!ctx) return;
+            
+            const context = ctx.getContext('2d');
+            
+            if (chartId === 'volumeTrendChart' && app.volumeTrendChart) {
+                app.volumeTrendChart.destroy();
+            }
+            if (chartId === 'individualPhrasesChart' && app.individualPhrasesChart) {
+                app.individualPhrasesChart.destroy();
+            }
+            
+            const colors = ['#4682B4', '#008B8B', '#8B4513', '#DC143C', '#9370DB', '#FF8C00', '#32CD32', '#FF1493'];
+            const datasets = [];
+            
+            phrases.forEach((phrase, index) => {
+                if (!phrase.temporalAnalysis) return;
+                
+                const color = colors[index % colors.length];
+                let data;
+                
+                if (chartId === 'volumeTrendChart') {
+                    // Timeline globale
+                    const globalTime = index * 2.5; // Spaziatura tra frasi
+                    data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
+                        x: globalTime + phrase.temporalAnalysis.timeData[i],
+                        y: volume
+                    }));
+                } else {
+                    // Confronto normalizzato
+                    data = phrase.temporalAnalysis.volumeData.map((volume, i) => ({
+                        x: (i / (phrase.temporalAnalysis.volumeData.length - 1)) * 100,
+                        y: volume
+                    }));
+                }
+                
+                datasets.push({
+                    label: `Frase ${phrase.index + 1}`,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: chartId === 'individualPhrasesChart' ? color + '30' : color,
+                    borderWidth: 3,
+                    fill: chartId === 'individualPhrasesChart',
+                    tension: 0.3,
+                    pointRadius: 4
+                });
+            });
+            
+            const chart = new Chart(context, {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title,
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: chartId === 'volumeTrendChart' ? 'Tempo (secondi)' : 'Progresso (%)'
+                            },
+                            type: 'linear'
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Volume (dB)'
+                            },
+                            suggestedMin: -35,
+                            suggestedMax: -5
+                        }
+                    }
+                }
+            });
+            
+            if (chartId === 'volumeTrendChart') {
+                app.volumeTrendChart = chart;
+            } else {
+                app.individualPhrasesChart = chart;
+            }
+        }
+
+        // === EVENT HANDLERS ===
+        function testMicrophone() {
+            log('Test microfono avviato...');
+            
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    log('Microfono accessibile ✅', 'success');
+                    showMessage('Microfono funziona correttamente!');
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(error => {
+                    log(`Errore microfono: ${error.message}`, 'error');
+                    showMessage('Errore accesso microfono. Controlla i permessi.', 'error');
+                });
+        }
+
+        function startRecording() {
+            log('Avvio registrazione...');
+            
+            navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            })
+                .then(stream => {
+                    app.recordingChunks = [];
+                    app.mediaRecorder = new MediaRecorder(stream);
+                    app.isRecording = true;
+                    app.recordingStartTime = Date.now();
+                    
+                    // Aggiorna timer
+                    app.recordingTimer = setInterval(updateRecordingTimer, 100);
+                    
+                    app.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            app.recordingChunks.push(event.data);
+                        }
+                    };
+                    
+                    app.mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(app.recordingChunks, { type: 'audio/wav' });
+                        convertBlobToAudioData(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    app.mediaRecorder.start(100); // Raccoglie dati ogni 100ms
+                    
+                    log('Registrazione avviata', 'success');
+                    showMessage('Registrazione in corso... Parla chiaramente!');
+                    
+                    // Aggiorna UI
+                    document.getElementById('startRecording').disabled = true;
+                    document.getElementById('stopRecording').disabled = false;
+                    document.getElementById('startRecording').classList.add('recording');
+                    
+                    // Simula visualizzatore audio
+                    animateAudioBars();
+                })
+                .catch(error => {
+                    log(`Errore registrazione: ${error.message}`, 'error');
+                    showMessage('Errore durante la registrazione. Controlla i permessi del microfono.', 'error');
+                });
+        }
+
+        function stopRecording() {
+            if (app.isRecording && app.mediaRecorder) {
+                app.mediaRecorder.stop();
+                app.isRecording = false;
+                
+                if (app.recordingTimer) {
+                    clearInterval(app.recordingTimer);
+                    app.recordingTimer = null;
+                }
+                
+                log('Registrazione fermata', 'success');
+                
+                // Aggiorna UI
+                document.getElementById('startRecording').disabled = false;
+                document.getElementById('stopRecording').disabled = true;
+                document.getElementById('startRecording').classList.remove('recording');
+                
+                // Ferma animazione audio bars
+                stopAudioBarsAnimation();
+            }
+        }
+
+        function convertBlobToAudioData(blob) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                
+                // Per demo, generiamo dati audio simulati
+                const duration = (Date.now() - app.recordingStartTime) / 1000;
+                app.currentAudioData = new Float32Array(44100 * Math.max(1, duration));
+                for (let i = 0; i < app.currentAudioData.length; i++) {
+                    app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
+                }
+                
+                document.getElementById('analyzePhrases').disabled = false;
+                document.getElementById('autoDetectVoice').disabled = false;
+                showMessage(`Audio registrato: ${duration.toFixed(1)}s`);
+                log(`Audio processato: ${duration.toFixed(1)}s`, 'success');
+            };
+            reader.readAsArrayBuffer(blob);
+        }
+
+        function animateAudioBars() {
+            if (!app.isRecording) return;
+            
+            const bars = document.querySelectorAll('.audio-bar');
+            bars.forEach(bar => {
+                const height = Math.random() * 50 + 5;
+                bar.style.height = `${height}px`;
+            });
+            
+            if (app.isRecording) {
+                setTimeout(animateAudioBars, 100);
+            }
+        }
+
+        function stopAudioBarsAnimation() {
+            const bars = document.querySelectorAll('.audio-bar');
+            bars.forEach(bar => {
+                bar.style.height = '2px';
+            });
+        }
+
+        function autoDetectVoice() {
+            if (!app.currentAudioData) {
+                showMessage('Nessun audio da analizzare. Registra prima un audio.', 'error');
+                return;
+            }
+            
+            log('Iniziando auto-rilevamento voce...');
+            showProcessing(true, 'Analizzando automaticamente la voce...');
+            
+            setTimeout(() => {
+                const phrases = detectPhrases(app.currentAudioData);
+                const classification = classifyVoice(phrases);
+                
+                // Mostra risultati
+                document.getElementById('autoDetectionResult').style.display = 'block';
+                
+                const voiceEmojis = { ARIA: '🌬️', ACQUA: '💧', TERRA: '🌍', FUOCO: '🔥' };
+                document.getElementById('detectedVoice').textContent = 
+                    `${voiceEmojis[classification.detectedVoice]} ${classification.detectedVoice}`;
+                
+                document.getElementById('confidenceScore').textContent = 
+                    `Precisione: ${(classification.confidence * 100).toFixed(1)}%`;
+                
+                document.getElementById('scoreAria').textContent = `${classification.scores.ARIA.toFixed(1)}%`;
+                document.getElementById('scoreAcqua').textContent = `${classification.scores.ACQUA.toFixed(1)}%`;
+                document.getElementById('scoreTerra').textContent = `${classification.scores.TERRA.toFixed(1)}%`;
+                document.getElementById('scoreFuoco').textContent = `${classification.scores.FUOCO.toFixed(1)}%`;
+                
+                showProcessing(false);
+                showMessage(`Voce rilevata: ${classification.detectedVoice} con precisione ${(classification.confidence * 100).toFixed(1)}%`);
+            }, 1500);
+        }
+
+        function analyzePhrases() {
+            if (!app.currentAudioData) {
+                showMessage('Nessun audio da analizzare. Registra o carica un file audio.', 'error');
+                return;
+            }
+            
+            log('Iniziando analisi frasi dettagliata...');
+            showProcessing(true, 'Analizzando le frasi...');
+            
+            setTimeout(() => {
+                const phrases = detectPhrases(app.currentAudioData);
+                const classification = classifyVoice(phrases);
+                
+                if (phrases.length === 0) {
+                    showMessage('Nessuna frase rilevata. Prova a registrare di nuovo.', 'error');
+                    showProcessing(false);
+                    return;
+                }
+                
+                app.currentPhrases = phrases;
+                
+                // Aggiorna summary
+                document.getElementById('phraseResults').style.display = 'block';
+                document.getElementById('totalPhrases').textContent = phrases.length;
+                document.getElementById('dominantVoice').textContent = `🎤 ${classification.detectedVoice}`;
+                document.getElementById('avgPhraseDuration').textContent = 
+                    `${(phrases.reduce((sum, p) => sum + p.duration, 0) / phrases.length).toFixed(1)}s`;
+                document.getElementById('overallClarity').textContent = 
+                    classification.confidence > 0.7 ? 'Alta' : classification.confidence > 0.5 ? 'Media' : 'Bassa';
+                
+                // Crea cards frasi
+                const container = document.getElementById('phraseInfoGrid');
+                container.innerHTML = '';
+                
+                const trendDescriptions = {
+                    ascending: '📈 Crescente',
+                    descending: '📉 Calante',
+                    stable: '➡️ Stabile',
+                    dynamic: '🎢 Dinamico'
+                };
+                
+                phrases.forEach((phrase, index) => {
+                    const card = document.createElement('div');
+                    card.className = `phrase-card trend-${phrase.temporalAnalysis.trend}`;
+                    
+                    const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                    
+                    card.innerHTML = `
+                        <div class="phrase-title">Frase ${phrase.index + 1}</div>
+                        <div class="phrase-trend trend-${phrase.temporalAnalysis.trend}">
+                            ${trendDescriptions[phrase.temporalAnalysis.trend]}
+                        </div>
+                        <div>Durata: ${phrase.duration.toFixed(1)}s</div>
+                        <div>Cambio: ${phrase.temporalAnalysis.volumeChange > 0 ? '+' : ''}${phrase.temporalAnalysis.volumeChange.toFixed(1)}dB</div>
+                        <div>Media: ${phrase.temporalAnalysis.avgVolume.toFixed(1)}dB</div>
+                        <div style="margin-top: 8px; font-style: italic; color: #666; font-size: 12px;">
+                            "${sampleText}"
+                        </div>
+                        <div class="phrase-controls">
+                            <button class="speak-btn" data-phrase-index="${index}">
+                                <span>🔊</span>
+                                Ascolta
+                            </button>
+                        </div>
+                    `;
+                    
+                    const speakBtn = card.querySelector('.speak-btn');
+                    speakBtn.addEventListener('click', () => speakText(sampleText, index));
+                    
+                    container.appendChild(card);
+                });
+                
+                // Crea grafici
+                createChart(phrases, 'volumeTrendChart', '📈 Andamento Volume nel Tempo - Tutte le Frasi');
+                createChart(phrases, 'individualPhrasesChart', '🔄 Confronto Andamenti per Frase (Normalizzato 0-100%)');
+                
+                // Abilita TTS per tutte le frasi
+                document.getElementById('speakAllPhrases').disabled = false;
+                
+                showProcessing(false);
+                showMessage(`Analisi completata: ${phrases.length} frasi rilevate`);
+            }, 2000);
+        }
+
+        function speakAllPhrases() {
+            if (app.isSpeaking) {
+                app.speechSynth.cancel();
+                app.isSpeaking = false;
+                document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
+                return;
+            }
+            
+            if (app.currentPhrases.length === 0) return;
+            
+            app.isSpeaking = true;
+            document.getElementById('speakAllPhrases').innerHTML = '<span>⏹️</span>Ferma Lettura';
+            
+            let currentIndex = 0;
+            
+            function speakNext() {
+                if (currentIndex >= app.currentPhrases.length || !app.isSpeaking) {
+                    app.isSpeaking = false;
+                    document.getElementById('speakAllPhrases').innerHTML = '<span>🎤</span>Leggi Tutte le Frasi';
+                    return;
+                }
+                
+                const phrase = app.currentPhrases[currentIndex];
+                const sampleText = generateSampleText(phrase.temporalAnalysis.trend);
+                
+                const utterance = new SpeechSynthesisUtterance(sampleText);
+                
+                // Configura TTS
+                const rate = document.getElementById('speechRate')?.value || 1;
+                const pitch = document.getElementById('speechPitch')?.value || 1;
+                const volume = document.getElementById('speechVolume')?.value || 0.8;
+                
+                utterance.rate = parseFloat(rate);
+                utterance.pitch = parseFloat(pitch);
+                utterance.volume = parseFloat(volume);
+                
+                utterance.onend = () => {
+                    currentIndex++;
+                    setTimeout(speakNext, 500);
+                };
+                
+                app.speechSynth.speak(utterance);
+                log(`TTS: "${sampleText}" (Frase ${currentIndex + 1})`);
+            }
+            
+            speakNext();
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('audio/')) {
+                showMessage('Seleziona un file audio valido.', 'error');
+                return;
+            }
+            
+            log(`Caricamento file: ${file.name}`);
+            showProcessing(true, 'Caricamento file audio...');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Simula caricamento e conversione
+                setTimeout(() => {
+                    app.currentAudioData = new Float32Array(44100 * 5); // 5 secondi simulati
+                    for (let i = 0; i < app.currentAudioData.length; i++) {
+                        app.currentAudioData[i] = (Math.random() - 0.5) * 0.1;
+                    }
+                    
+                    document.getElementById('analyzePhrases').disabled = false;
+                    document.getElementById('autoDetectVoice').disabled = false;
+                    
+                    showProcessing(false);
+                    showMessage(`File caricato: ${file.name} (5.0s)`);
+                    log('File caricato con successo', 'success');
+                }, 1000);
+            };
+            
+            reader.onerror = () => {
+                showProcessing(false);
+                showMessage('Errore durante il caricamento del file.', 'error');
+                log('Errore caricamento file', 'error');
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function selectVoice(voiceName) {
+            document.querySelectorAll('.voice-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            const selectedCard = document.querySelector(`[data-voice="${voiceName}"]`);
+            if (selectedCard) selectedCard.classList.add('selected');
+            
+            log(`Voce selezionata: ${voiceName}`, 'success');
+        }
+
+        function clearResults() {
+            document.getElementById('phraseResults').style.display = 'none';
+            document.getElementById('autoDetectionResult').style.display = 'none';
+            document.getElementById('analyzePhrases').disabled = true;
+            document.getElementById('autoDetectVoice').disabled = true;
+            document.getElementById('speakAllPhrases').disabled = true;
+            document.getElementById('recordingTime').textContent = '00:00';
+            
+            if (app.isSpeaking) {
+                app.speechSynth.cancel();
+                app.isSpeaking = false;
+            }
+            
+            app.currentAudioData = null;
+            app.currentPhrases = [];
+            
+            if (app.volumeTrendChart) {
+                app.volumeTrendChart.destroy();
+                app.volumeTrendChart = null;
+            }
+            
+            if (app.individualPhrasesChart) {
+                app.individualPhrasesChart.destroy();
+                app.individualPhrasesChart = null;
+            }
+            
+            // Reset file input
+            document.getElementById('fileInput').value = '';
+            
+            document.getElementById('debugLog').innerHTML = 'Log pulito...<br>';
+            log('Risultati puliti', 'success');
+        }
+
+        function setupTTS() {
+            if (!app.speechSynth) {
+                log('Speech Synthesis non disponibile', 'warning');
+                return;
+            }
+            
+            function loadVoices() {
+                app.availableVoices = app.speechSynth.getVoices();
+                const voiceSelect = document.getElementById('speechVoice');
+                
+                if (voiceSelect) {
+                    voiceSelect.innerHTML = '<option value="">Default</option>';
+                    
+                    app.availableVoices.forEach((voice, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        voiceSelect.appendChild(option);
+                    });
+                    
+                    log(`Caricate ${app.availableVoices.length} voci TTS`, 'success');
+                }
+            }
+            
+            if (app.speechSynth.getVoices().length > 0) {
+                loadVoices();
+            } else {
+                app.speechSynth.addEventListener('voiceschanged', loadVoices);
+            }
+        }
+
+        function setupAudioVisualizer() {
+            const visualizer = document.getElementById('audioVisualizer');
+            if (visualizer) {
+                visualizer.innerHTML = '';
+                for (let i = 0; i < 50; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    bar.style.left = `${i * 4}px`;
+                    bar.style.height = '2px';
+                    visualizer.appendChild(bar);
+                }
+            }
+        }
+
+        // === INIZIALIZZAZIONE ===
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Voice Break AI inizializzata!', 'success');
+            
+            // Setup event listeners
+            document.getElementById('testMicrophone').addEventListener('click', testMicrophone);
+            document.getElementById('startRecording').addEventListener('click', startRecording);
+            document.getElementById('stopRecording').addEventListener('click', stopRecording);
+            document.getElementById('autoDetectVoice').addEventListener('click', autoDetectVoice);
+            document.getElementById('analyzePhrases').addEventListener('click', analyzePhrases);
+            document.getElementById('clearResults').addEventListener('click', clearResults);
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('speakAllPhrases').addEventListener('click', speakAllPhrases);
+            
+            // Voice cards
+            document.querySelectorAll('.voice-card').forEach(card => {
+                card.addEventListener('click', () => selectVoice(card.dataset.voice));
+            });
+            
+            // Setup componenti
+            setupTTS();
+            setupAudioVisualizer();
+            
+            // Controllo compatibilità browser
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                log('MediaDevices API non supportata', 'error');
+                showMessage('Browser non compatibile. Usa Chrome o Firefox.', 'error');
+                return;
+            }
+            
+            if (typeof MediaRecorder === 'undefined') {
+                log('MediaRecorder non supportato', 'error');
+                showMessage('MediaRecorder non supportato. Aggiorna il browser.', 'error');
+                return;
+            }
+            
+            log('Browser compatibile ✅', 'success');
+            log('Tutti i sistemi operativi. App pronta per l\'uso!', 'success');
+        });
+    </script>
+</body>
+</html>
