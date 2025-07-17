@@ -468,18 +468,89 @@
             position: absolute;
             bottom: 45px;
             left: 20px;
-            right: 20px;
-            height: 4px;
+            right: 80px;
+            height: 6px;
             background: rgba(0,0,0,0.1);
-            border-radius: 2px;
+            border-radius: 3px;
             z-index: 15;
+            cursor: pointer;
         }
 
         .chart-timeline-thumb {
             height: 100%;
-            background: #667eea;
-            border-radius: 2px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 3px;
             transition: all 0.3s ease;
+            cursor: grab;
+            position: relative;
+        }
+
+        .chart-timeline-thumb:hover {
+            background: linear-gradient(45deg, #5a6fd8, #6a4190);
+            transform: scaleY(1.2);
+        }
+
+        .chart-timeline-thumb:active {
+            cursor: grabbing;
+        }
+
+        /* 🆕 Hints navigazione */
+        .navigation-hints {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            z-index: 25;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            line-height: 1.4;
+        }
+
+        /* 🆕 Pulsante fullscreen */
+        .chart-fullscreen-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            z-index: 20;
+            transition: all 0.3s ease;
+        }
+
+        .chart-fullscreen-btn:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: #667eea;
+            transform: scale(1.1);
+        }
+
+        /* 🆕 Stili per fullscreen */
+        .chart-container:fullscreen {
+            height: 100vh;
+            width: 100vw;
+            padding: 40px;
+            border-radius: 0;
+        }
+
+        .chart-container:-webkit-full-screen {
+            height: 100vh;
+            width: 100vw;
+            padding: 40px;
+            border-radius: 0;
+        }
+
+        /* 🆕 Focus styles per navigazione keyboard */
+        .chart-container:focus {
+            outline: 2px solid #667eea;
+            outline-offset: 2px;
         }
 
         @media (max-width: 768px) {
@@ -1492,12 +1563,19 @@
                 addPhraseOverlaysExtended(chart.canvas, phrases, chart, totalDuration);
             }
             
+            
+            // 🆕 Aggiungi pulsante fullscreen
+            addFullscreenButton(chart, chartId);
+            
             if (chartId === 'volumeTrendChart') {
                 app.volumeTrendChart = chart;
             } else {
                 app.individualPhrasesChart = chart;
             }
         }
+
+        // 🆕 Overlay frasi esteso per timeline lunghe
+        function addPhraseOverlaysExtended(canvas, phrases, chart, totalDuration) {
 
         // 🆕 Aggiungi controlli scroll ai grafici
         function addScrollControls(chart, chartId, totalDuration) {
@@ -1565,8 +1643,242 @@
             container.appendChild(controls);
         }
 
-        // 🆕 Overlay frasi esteso per timeline lunghe
-        function addPhraseOverlaysExtended(canvas, phrases, chart, totalDuration) {
+        // 🆕 Aggiungi indicatore timeline (mini-mappa)
+        function addTimelineIndicator(chart, chartId, totalDuration) {
+            const container = chart.canvas.parentElement;
+            
+            // Rimuovi indicatore esistente
+            const existingIndicator = container.querySelector('.chart-timeline-indicator');
+            if (existingIndicator) existingIndicator.remove();
+            
+            if (totalDuration <= 12) return; // Non serve se tutto è visibile
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'chart-timeline-indicator';
+            
+            const thumb = document.createElement('div');
+            thumb.className = 'chart-timeline-thumb';
+            
+            // Calcola dimensioni del thumb
+            const visibleRatio = Math.min(12 / totalDuration, 1);
+            thumb.style.width = (visibleRatio * 100) + '%';
+            
+            indicator.appendChild(thumb);
+            container.appendChild(indicator);
+            
+            // Aggiorna posizione thumb quando il grafico si sposta
+            const updateThumbPosition = () => {
+                const currentMin = chart.scales.x.min || 0;
+                const startRatio = currentMin / totalDuration;
+                thumb.style.left = (startRatio * 100) + '%';
+            };
+            
+            // Listener per aggiornare la posizione
+            chart.options.onAnimationComplete = updateThumbPosition;
+            
+            // Click su indicatore per navigare
+            indicator.addEventListener('click', (e) => {
+                const rect = indicator.getBoundingClientRect();
+                const clickRatio = (e.clientX - rect.left) / rect.width;
+                const targetTime = clickRatio * totalDuration;
+                
+                // Centra la vista sul punto cliccato
+                const newMin = Math.max(0, targetTime - 6);
+                const newMax = Math.min(totalDuration, targetTime + 6);
+                
+                chart.scales.x.options.min = newMin;
+                chart.scales.x.options.max = newMax;
+                chart.update('none');
+                updateThumbPosition();
+            });
+            
+            // Drag per scorrere
+            let isDragging = false;
+            thumb.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const rect = indicator.getBoundingClientRect();
+                const dragRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const targetTime = dragRatio * totalDuration;
+                
+                const newMin = Math.max(0, targetTime - 6);
+                const newMax = Math.min(totalDuration, newMin + 12);
+                
+                chart.scales.x.options.min = newMin;
+                chart.scales.x.options.max = newMax;
+                chart.update('none');
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        }
+
+        // 🆕 Navigazione da tastiera
+        function addKeyboardNavigation(chart, totalDuration) {
+            const container = chart.canvas.parentElement;
+            
+            // Rendi il container focusable
+            container.tabIndex = 0;
+            container.style.outline = 'none';
+            
+            container.addEventListener('keydown', (e) => {
+                if (!container.contains(document.activeElement)) return;
+                
+                const currentMin = chart.scales.x.min || 0;
+                const currentMax = chart.scales.x.max || 12;
+                const viewWidth = currentMax - currentMin;
+                
+                let newMin, newMax;
+                
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        newMin = Math.max(0, currentMin - 2);
+                        newMax = newMin + viewWidth;
+                        break;
+                        
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        newMax = Math.min(totalDuration, currentMax + 2);
+                        newMin = newMax - viewWidth;
+                        break;
+                        
+                    case 'Home':
+                        e.preventDefault();
+                        newMin = 0;
+                        newMax = Math.min(12, totalDuration);
+                        break;
+                        
+                    case 'End':
+                        e.preventDefault();
+                        newMax = totalDuration;
+                        newMin = Math.max(0, totalDuration - 12);
+                        break;
+                        
+                    case '+':
+                    case '=':
+                        e.preventDefault();
+                        // Zoom in
+                        const zoomInWidth = viewWidth * 0.8;
+                        const center = (currentMin + currentMax) / 2;
+                        newMin = center - zoomInWidth / 2;
+                        newMax = center + zoomInWidth / 2;
+                        break;
+                        
+                    case '-':
+                        e.preventDefault();
+                        // Zoom out
+                        const zoomOutWidth = Math.min(viewWidth * 1.25, totalDuration);
+                        const centerOut = (currentMin + currentMax) / 2;
+                        newMin = Math.max(0, centerOut - zoomOutWidth / 2);
+                        newMax = Math.min(totalDuration, centerOut + zoomOutWidth / 2);
+                        break;
+                        
+                    default:
+                        return;
+                }
+                
+                chart.scales.x.options.min = newMin;
+                chart.scales.x.options.max = newMax;
+                chart.update('none');
+            });
+            
+            // Mostra suggerimenti controlli quando focused
+            container.addEventListener('focus', () => {
+                showNavigationHints(container);
+            });
+        }
+
+        // 🆕 Mostra suggerimenti navigazione
+        function showNavigationHints(container) {
+            const existing = container.querySelector('.navigation-hints');
+            if (existing) return;
+            
+            const hints = document.createElement('div');
+            hints.className = 'navigation-hints';
+            hints.style.cssText = `
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 11px;
+                z-index: 25;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            `;
+            
+            hints.innerHTML = `
+                <div><strong>⌨️ Controlli Tastiera:</strong></div>
+                <div>← → : Scorri timeline</div>
+                <div>+ - : Zoom in/out</div>
+                <div>Home/End : Inizio/Fine</div>
+            `;
+            
+            container.appendChild(hints);
+            
+            // Fade in
+            setTimeout(() => hints.style.opacity = '1', 10);
+            
+            // Fade out dopo 3 secondi
+            setTimeout(() => {
+                hints.style.opacity = '0';
+                setTimeout(() => hints.remove(), 300);
+            }, 3000);
+        }
+
+        // 🆕 Aggiungi pulsante fullscreen per i grafici
+        function addFullscreenButton(chart, chartId) {
+            const container = chart.canvas.parentElement;
+            
+            const fullscreenBtn = document.createElement('button');
+            fullscreenBtn.innerHTML = '⛶';
+            fullscreenBtn.title = 'Visualizzazione a schermo intero';
+            fullscreenBtn.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: rgba(255,255,255,0.9);
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size: 16px;
+                z-index: 20;
+                transition: all 0.3s ease;
+            `;
+            
+            fullscreenBtn.addEventListener('click', () => {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen();
+                } else if (container.webkitRequestFullscreen) {
+                    container.webkitRequestFullscreen();
+                } else if (container.msRequestFullscreen) {
+                    container.msRequestFullscreen();
+                }
+            });
+            
+            fullscreenBtn.addEventListener('mouseenter', () => {
+                fullscreenBtn.style.background = 'rgba(102, 126, 234, 0.1)';
+                fullscreenBtn.style.borderColor = '#667eea';
+            });
+            
+            fullscreenBtn.addEventListener('mouseleave', () => {
+                fullscreenBtn.style.background = 'rgba(255,255,255,0.9)';
+                fullscreenBtn.style.borderColor = '#ddd';
+            });
+            
+            container.appendChild(fullscreenBtn);
+        }
             const container = canvas.parentElement;
             
             // Rimuovi overlay esistenti
